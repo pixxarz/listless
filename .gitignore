@@ -1,0 +1,14 @@
+# ไฟล์ระบบ
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ไฟล์ชั่วคราว
+*.log
+*.tmp
+logo_b64.txt
+
+# ไฟล์ตั้งค่าเครื่อง (ถ้ามีในอนาคต)
+.env
+.env.local
+node_modules/
