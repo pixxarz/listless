@@ -32,7 +32,7 @@
       padding: 28px 18px 60px;
       font-size: 15px; line-height: 1.5;
     }
-    .page-wrap { max-width: 1180px; margin: 0 auto; }
+    .page-wrap { max-width: 1320px; margin: 0 auto; }
     .card {
       background: #fff; border-radius: 20px;
       box-shadow: 0 10px 40px rgba(91,33,182,.12);
@@ -106,8 +106,8 @@
     #studentTable tbody td:last-child { border-right: none; }
     #studentTable tbody tr:nth-child(even) { background: #faf9fe; }
 
-    .col-no { width: 50px; } .col-name { width: 220px; } .col-class { width: 108px; }
-    .col-num { width: 84px; } .col-percent { width: 116px; } .col-remark { width: 130px; min-width: 130px; }
+    .col-no { width: 50px; } .col-seat { width: 70px; } .col-name { width: 320px; } .col-class { width: 86px; }
+    .col-num { width: 66px; } .col-percent { width: 96px; } .col-remark { width: 130px; min-width: 130px; }
     .col-del { width: 62px; }
 
     .name-cell { display: flex; flex-direction: column; gap: 5px; }
@@ -118,9 +118,10 @@
     .class-cell-wrap .pfx { font-weight: 600; color: #4b5563; }
     .class-cell-wrap .sep { color: #6b7280; font-weight: 700; }
     .class-cell-wrap input { width: 34px; text-align: center; padding: 8px 4px; }
-    .num-cell input { width: 68px; text-align: center; }
+    .num-cell input { width: 52px; text-align: center; font-size: 13px; padding-left: 4px; padding-right: 4px; }
+    .num-cell input::-webkit-inner-spin-button, .num-cell input::-webkit-outer-spin-button { margin-left: 0; }
     .num-cell input.auto { background: #f3f4f6; font-weight: 600; color: #374151; }
-    .percent-cell input { width: 76px; text-align: center; background: #ede9fe; font-weight: 700; color: #5b21b6; border-color: #c4b5fd; }
+    .percent-cell input { width: 64px; text-align: center; background: #ede9fe; font-weight: 700; color: #5b21b6; border-color: #c4b5fd; }
 
     /* ===== หมายเหตุ dropdown+input ===== */
     .remark-wrap { display: flex; flex-direction: column; gap: 5px; }
@@ -171,6 +172,21 @@
     .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     .toast.ok { background: #047857; }
     .toast.err { background: #b91c1c; }
+
+    /* ช่อง % เมื่อเข้าเรียนถึง/เกิน 70% (ไม่เข้าข่ายรายงาน) */
+    .percent-cell input.pct-over { background: #fee2e2 !important; color: #dc2626 !important; border-color: #f87171 !important; font-weight: 700; }
+
+    /* ===== Popup แจ้งเตือนกลางจอ ===== */
+    .alert-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,.55); display: none; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
+    .alert-backdrop.show { display: flex; }
+    .alert-box { background: #fff; border-radius: 18px; max-width: 460px; width: 100%; padding: 28px 26px 22px; box-shadow: 0 18px 50px rgba(0,0,0,.3); text-align: center; animation: alertPop .25s cubic-bezier(.2,.9,.3,1.2); }
+    @keyframes alertPop { from { transform: scale(.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .alert-box .alert-icon { width: 56px; height: 56px; border-radius: 50%; background: #fee2e2; color: #dc2626; font-size: 30px; line-height: 56px; margin: 0 auto 14px; }
+    .alert-box .alert-title { font-size: 19px; font-weight: 700; color: #b91c1c; margin-bottom: 8px; }
+    .alert-box .alert-msg { font-size: 15px; color: #374151; line-height: 1.6; margin-bottom: 20px; text-align: left; }
+    .alert-box .alert-msg b { color: #dc2626; }
+    .alert-box .alert-btn { background: linear-gradient(135deg,#7c3aed,#6d28d9); color: #fff; border: none; border-radius: 24px; padding: 11px 34px; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .alert-box .alert-btn:hover { transform: translateY(-1px); }
 
     /* ===== PDF Modal ===== */
     .pdf-backdrop {
@@ -223,13 +239,15 @@
       vertical-align: middle; word-break: break-word; overflow-wrap: break-word;
       box-sizing: border-box;
     }
-    .od-table thead th { background: #e5e7eb; font-weight: 700; font-size: 13pt; line-height: 1.3; }
+    .od-table thead th { background: #e5e7eb; font-weight: 700; font-size: 11pt; line-height: 1.25; }
     .od-table td.tl { text-align: left; padding-left: 6px; }
+    /* เซลล์ชื่อ-สกุล: ไม่ตัดบรรทัด (font-size ปรับอัตโนมัติตามความยาวใน JS) */
+    .od-table td.od-name { text-align: left; padding-left: 6px; white-space: nowrap; word-break: normal; overflow-wrap: normal; overflow: hidden; }
     .od-empty-row td { height: 30px; }
     /* ส่วนลงชื่อท้าย */
     .od-sign { margin-top: 20px; font-size: 15pt; }
     .od-sign .intro { text-indent: 2.5em; margin-bottom: 24px; }
-    .od-sign .sign-block { text-align: center; float: right; width: 260px; line-height: 2; }
+    .od-sign .sign-block { text-align: center; float: right; min-width: 260px; width: max-content; max-width: 100%; line-height: 2; white-space: nowrap; }
     .od-sign .sign-block::after { content: ''; display: block; clear: both; }
     .od-sign-clear { clear: both; }
 
@@ -362,6 +380,7 @@
           <tr>
             <th class="col-no">ลำดับที่</th>
             <th class="col-name">ชื่อ – สกุล</th>
+            <th class="col-seat">เลขที่</th>
             <th class="col-class">ชั้น / ห้อง</th>
             <th class="col-num">คาบทั้งหมด</th>
             <th class="col-num">มาเรียน</th>
@@ -402,10 +421,21 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Popup แจ้งเตือน -->
+<div class="alert-backdrop" id="alertModal">
+  <div class="alert-box">
+    <div class="alert-icon">!</div>
+    <div class="alert-title" id="alertTitle">แจ้งเตือน</div>
+    <div class="alert-msg" id="alertMsg"></div>
+    <button type="button" class="alert-btn" id="alertBtn">รับทราบ</button>
+  </div>
+</div>
+
 <script>
   var THRESHOLD = 70;
   var PREFIX_OPTIONS = ['ด.ช.','ด.ญ.','นาย','น.ส.'];
   var REMARK_OPTIONS = ['-- เลือก --','ขาดเรียนนาน','อื่นๆ (กรอกเอง)'];
+  var SEAT_OPTIONS = (function(){ var a=['–']; for(var n=1;n<=60;n++) a.push(String(n)); return a; })();
   var MIN_DOC_ROWS = 10;
   var THAI_MONTHS = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
     'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
@@ -443,6 +473,11 @@
     var pfxSel = mkSelect(PREFIX_OPTIONS); pfxSel.dataset.field='prefix';
     var nameInp = document.createElement('input'); nameInp.type='text'; nameInp.placeholder='ชื่อ-นามสกุล'; nameInp.dataset.field='name';
     nl.appendChild(pfxSel); nl.appendChild(nameInp); nw.appendChild(nl); tdName.appendChild(nw); tr.appendChild(tdName);
+
+    // เลขที่ (dropdown 1-60)
+    var tdSeat = document.createElement('td'); tdSeat.className='col-seat';
+    var seatSel = mkSelect(SEAT_OPTIONS); seatSel.dataset.field='seat';
+    tdSeat.appendChild(seatSel); tr.appendChild(tdSeat);
 
     // ชั้น/ห้อง
     var tdCls = document.createElement('td'); tdCls.className='col-class';
@@ -482,7 +517,10 @@
       var tot = parseFloat(perInp.value)||0, pres = parseFloat(presInp.value)||0;
       if (tot>0 || pres>0) { absInp.value = Math.max(0, tot-pres); }
       else { absInp.value = ''; }
-      pctInp.value = tot>0 ? (pres/tot*100).toFixed(1) : '';
+      var pct = tot>0 ? (pres/tot*100) : null;
+      pctInp.value = pct!=null ? pct.toFixed(1) : '';
+      // เข้าเรียน >= 70% = ไม่เข้าข่ายต้องรายงาน → ทำช่องแดงเตือน
+      pctInp.classList.toggle('pct-over', pct!=null && pct >= THRESHOLD);
     }
     perInp.addEventListener('input', recalc);
     presInp.addEventListener('input', recalc);
@@ -532,7 +570,8 @@
     var students = [];
     studentBody.querySelectorAll('tr').forEach(function(tr,i){
       var g = function(f){ var e=tr.querySelector('[data-field="'+f+'"]'); return e?e.value.trim():''; };
-      students.push({ order:i+1, prefix:g('prefix'), name:g('name'), classroom:buildCls(g('level'),g('room')),
+      var seat=g('seat'); if(seat==='–') seat='';
+      students.push({ order:i+1, seat:seat, prefix:g('prefix'), name:g('name'), classroom:buildCls(g('level'),g('room')),
         periods:g('periods'), present:g('present'), absent:g('absent'), percent:g('percent'), remark:getRemark(tr) });
     });
     var fn=document.getElementById('teacherFirstName').value.trim();
@@ -569,6 +608,17 @@
     return errs;
   }
 
+  // ===== Popup แจ้งเตือนกลางจอ =====
+  var alertModal=document.getElementById('alertModal');
+  function showAlert(title,msgHtml){
+    document.getElementById('alertTitle').textContent=title;
+    document.getElementById('alertMsg').innerHTML=msgHtml;
+    alertModal.classList.add('show');
+  }
+  function closeAlert(){ alertModal.classList.remove('show'); }
+  document.getElementById('alertBtn').addEventListener('click', closeAlert);
+  alertModal.addEventListener('click', function(e){ if(e.target===alertModal) closeAlert(); });
+
   var toastEl=document.getElementById('toast'), toastTmr=null;
   function showToast(msg,type){
     toastEl.textContent=msg; toastEl.className='toast show'+(type?' '+type:'');
@@ -598,6 +648,14 @@
     var d=collectData(), errs=validate(d);
     if(errs.length){showToast('กรุณากรอก: '+errs.join(', '),'err');return;}
     d.students=d.students.filter(function(s){return s.name;});
+    // กันบันทึก: นักเรียนที่เข้าเรียนถึง/เกิน 70% ไม่เข้าข่ายแบบฟอร์มนี้
+    var over=d.students.filter(function(s){ var p=parseFloat(s.percent); return !isNaN(p) && p>=THRESHOLD; });
+    if(over.length){
+      var list=over.map(function(s){ return '&bull; '+esc((s.prefix||'')+s.name)+' &mdash; เข้าเรียน <b>'+esc(s.percent)+'%</b>'; }).join('<br>');
+      showAlert('บันทึกไม่ได้',
+        'แบบฟอร์มนี้สำหรับนักเรียนที่เข้าเรียน<b>ไม่ถึง '+THRESHOLD+'%</b> เท่านั้น<br><br>นักเรียนต่อไปนี้เข้าเรียนถึงเกณฑ์แล้ว กรุณาแก้ไขตัวเลข หรือลบรายชื่อออกก่อนบันทึก<br><br>'+list);
+      return;
+    }
     saveBtn.disabled=true; saveBtn.textContent='กำลังบันทึก...';
     var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
     fetch(SHEET_URL, {
@@ -632,9 +690,10 @@
       var s=rows[i];
       if(s){
         var remStyle='text-align:left;padding-left:6px;'+(s.remark==='ขาดเรียนนาน'?'color:#dc2626;font-weight:700;':'');
-        bodyHtml+='<tr><td>'+(i+1)+'</td><td style="text-align:left;padding-left:6px;font-size:18.6667px;">'+esc((s.prefix||'')+s.name)+'</td><td>'+esc(s.classroom)+'</td><td>'+esc(s.periods)+'</td><td>'+esc(s.present)+'</td><td>'+esc(s.absent)+'</td><td>'+esc(s.percent)+'</td><td style="'+remStyle+'">'+esc(s.remark)+'</td></tr>';
+        var fullName=(s.prefix||'')+s.name;
+        bodyHtml+='<tr><td>'+(i+1)+'</td><td class="od-name" style="font-size:18.6667px;">'+esc(fullName)+'</td><td>'+esc(s.seat)+'</td><td>'+esc(s.classroom)+'</td><td>'+esc(s.periods)+'</td><td>'+esc(s.present)+'</td><td>'+esc(s.absent)+'</td><td>'+esc(s.percent)+'</td><td style="'+remStyle+'">'+esc(s.remark)+'</td></tr>';
       } else {
-        bodyHtml+='<tr class="od-empty-row"><td>'+(i+1)+'</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+        bodyHtml+='<tr class="od-empty-row"><td>'+(i+1)+'</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
       }
     }
     // ชื่อครูสำหรับลงนาม
@@ -656,10 +715,10 @@
         'ปีการศึกษา <b>'+esc(ob(d.academicYear))+'</b> '+
         'มีนักเรียนเวลาเรียนไม่ถึง '+THRESHOLD+' % ดังต่อไปนี้</div>'+
       '<table class="od-table">'+
-        '<colgroup><col style="width:6%"><col style="width:36%"><col style="width:7%"><col style="width:8%"><col style="width:8%"><col style="width:8%"><col style="width:11%"><col style="width:16%"></colgroup>'+
+        '<colgroup><col style="width:5%"><col style="width:40%"><col style="width:6%"><col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:6%"><col style="width:9%"><col style="width:15%"></colgroup>'+
         '<thead>'+
           '<tr>'+
-            '<th rowspan="2">ที่</th><th rowspan="2">ชื่อ – สกุล</th><th rowspan="2">ชั้น/ห้อง</th>'+
+            '<th rowspan="2">ที่</th><th rowspan="2">ชื่อ – สกุล</th><th rowspan="2" style="white-space:nowrap">เลขที่</th><th rowspan="2">ชั้น/ห้อง</th>'+
             '<th colspan="3">จำนวนชั่วโมง</th>'+
             '<th rowspan="2">%<br/>การเข้าเรียน</th><th rowspan="2">หมายเหตุ</th>'+
           '</tr>'+
@@ -678,10 +737,40 @@
       '</div>';
   }
 
+  // วัดความกว้างจริง แล้วย่อฟอนต์ชื่อให้เต็มคอลัมพอดี (ไม่ล้น ไม่เหลือที่ว่างเกิน)
+  // วัดความกว้างชื่อด้วย Canvas (ฟอนต์จริง) แล้วย่อให้เต็มคอลัมพอดี — ชื่อสั้นคงขนาดใหญ่ปกติ
+  var NAME_MAX_FS=18.6667, NAME_MIN_FS=8;
+  function fitNames(){
+    var cells=printArea.querySelectorAll('td.od-name');
+    if(!cells.length) return;
+    var cv=fitNames._cv||(fitNames._cv=document.createElement('canvas'));
+    var ctx=cv.getContext('2d');
+    cells.forEach(function(td){
+      td.style.fontSize=NAME_MAX_FS+'px';
+      var cs=getComputedStyle(td);
+      var padL=parseFloat(cs.paddingLeft)||0, padR=parseFloat(cs.paddingRight)||0;
+      var avail=td.clientWidth-padL-padR-2;   // พื้นที่ข้อความสุทธิ (เผื่อขอบ 2px)
+      if(avail<=0) return;                      // layout ยังไม่พร้อม — คงขนาดเดิม
+      var text=td.textContent||'';
+      ctx.font='400 '+NAME_MAX_FS+'px '+cs.fontFamily;
+      var w=ctx.measureText(text).width;
+      var fs=(w>avail) ? Math.max(NAME_MIN_FS, NAME_MAX_FS*avail/w) : NAME_MAX_FS;
+      td.style.fontSize=fs.toFixed(2)+'px';
+    });
+  }
+
   document.getElementById('exportPdfBtn').addEventListener('click', function(){
     if(!dataSaved){ showToast('กรุณากดบันทึกข้อมูลก่อน จึงจะส่งออก PDF ได้','err'); return; }
     var d=collectData(); printArea.innerHTML=buildDoc(d);
     pdfModal.classList.add('show'); document.body.style.overflow='hidden';
+    // รอฟอนต์โหลดเสร็จ + รอ layout 2 เฟรม แล้วค่อยวัด (กันวัดด้วยฟอนต์สำรองที่เพี้ยน)
+    var go=function(){ requestAnimationFrame(function(){ requestAnimationFrame(fitNames); }); };
+    if(document.fonts && document.fonts.load){
+      Promise.all([
+        document.fonts.load('400 18px "TH Sarabun New"'),
+        document.fonts.load('400 18px "Sarabun"')
+      ]).then(go).catch(go);
+    } else { go(); }
   });
   function closePdf(){ pdfModal.classList.remove('show'); document.body.style.overflow=''; }
   document.getElementById('closePdfBtn').addEventListener('click', closePdf);

@@ -34,10 +34,10 @@ function saveToSheet(data) {
       'timestamp', 'วันที่กรอก', 'คำนำหน้าครู', 'ชื่อครู',
       'กลุ่มสาระ', 'รหัสวิชา', 'ชื่อรายวิชา', 'หน่วยกิต',
       'ชั่วโมง/สัปดาห์', 'ภาคเรียน', 'ปีการศึกษา',
-      'ลำดับที่', 'คำนำหน้านักเรียน', 'ชื่อ-สกุล', 'ชั้น/ห้อง',
+      'ลำดับที่', 'เลขที่', 'คำนำหน้านักเรียน', 'ชื่อ-สกุล', 'ชั้น/ห้อง',
       'คาบทั้งหมด', 'มาเรียน', 'ขาดเรียน', '% การเข้าเรียน', 'หมายเหตุ'
     ]);
-    var headerRange = sheet.getRange(1, 1, 1, 20);
+    var headerRange = sheet.getRange(1, 1, 1, 21);
     headerRange.setFontWeight('bold');
     headerRange.setBackground('#6b21a8');
     headerRange.setFontColor('#ffffff');
@@ -51,7 +51,7 @@ function saveToSheet(data) {
       timestamp, data.dateInput, data.teacherPrefix, data.teacherName,
       data.subjectGroup, data.subjectCode, data.subjectName, data.credits,
       data.hoursPerWeek, data.semester, data.academicYear,
-      s.order, s.prefix, s.name, s.classroom,
+      s.order, s.seat, s.prefix, s.name, s.classroom,
       s.periods, s.present, s.absent, s.percent, s.remark
     ]);
   });

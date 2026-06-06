@@ -12,3 +12,6 @@ logo_b64.txt
 .env
 .env.local
 node_modules/
+
+# ไฟล์ตั้งค่า preview/dev เฉพาะเครื่อง
+.claude/
