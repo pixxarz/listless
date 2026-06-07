@@ -258,15 +258,15 @@
     jsonpId++;
     var name='__cb'+jsonpId+'_'+(new Date().getTime());
     var s=document.createElement('script');
-    var done=false;
+    var done=false, timer=null;
     window[name]=function(data){ done=true; cleanup(); cb(data); };
-    function cleanup(){ try{ delete window[name]; }catch(e){ window[name]=undefined; } if(s.parentNode) s.parentNode.removeChild(s); }
+    function cleanup(){ if(timer) clearTimeout(timer); try{ delete window[name]; }catch(e){ window[name]=undefined; } if(s.parentNode) s.parentNode.removeChild(s); }
     var q=[]; for(var k in params){ q.push(encodeURIComponent(k)+'='+encodeURIComponent(params[k])); }
     q.push('callback='+name);
     s.src=SHEET_URL+'?'+q.join('&');
     s.onerror=function(){ if(!done){ cleanup(); cb({error:'network'}); } };
     document.body.appendChild(s);
-    setTimeout(function(){ if(!done){ cleanup(); cb({error:'timeout'}); } }, 20000);
+    timer=setTimeout(function(){ if(!done){ cleanup(); cb({error:'timeout'}); } }, 20000);
   }
 
   // ====== Password gate ======
@@ -295,8 +295,7 @@
   });
   document.getElementById('gatePass').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('gateBtn').click(); });
   document.getElementById('outBtn').addEventListener('click', function(){
-    sessionStorage.removeItem('reportPass');
-    location.reload();
+    location.reload(); // กลับไปหน้ารหัสผ่าน (ระบบไม่ได้เก็บรหัสไว้ จึงไม่ต้องล้างอะไร)
   });
 
   // ไม่จำรหัส — เปิดหน้านี้ต้องกรอกรหัสผ่านใหม่ทุกครั้ง (ปลอดภัยสุด)
@@ -310,9 +309,9 @@
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('dash').classList.remove('hidden');
     buildFilterOptions();
-    ['fSearch','fRoom','fTeacher','fSubject','fTerm','fRemark'].forEach(function(id){
-      document.getElementById(id).addEventListener('input', render);
-      document.getElementById(id).addEventListener('change', render);
+    document.getElementById('fSearch').addEventListener('input', render); // ช่องค้นหา = พิมพ์ทีละตัว
+    ['fRoom','fTeacher','fSubject','fTerm','fRemark'].forEach(function(id){
+      document.getElementById(id).addEventListener('change', render); // เมนูเลือก = เลือกครั้งเดียว (กัน render ซ้ำ 2 รอบ)
     });
     // เลือกระดับชั้น → อัปเดตรายการห้องตามชั้นนั้น
     document.getElementById('fGrade').addEventListener('change', function(){ updateRoomOptions(); render(); });
@@ -360,7 +359,7 @@
   function fill(id, allLabel, opts){
     var sel=document.getElementById(id);
     var h='<option value="">'+allLabel+'</option>';
-    opts.forEach(function(o){ if(o.v!=='' && o.v!=null) h+='<option value="'+String(o.v).replace(/"/g,'&quot;')+'">'+o.t+'</option>'; });
+    opts.forEach(function(o){ if(o.v!=='' && o.v!=null) h+='<option value="'+esc(o.v).replace(/"/g,'&quot;')+'">'+esc(o.t)+'</option>'; }); // esc กันโค้ดอันตราย (XSS) จากข้อความในชีต
     sel.innerHTML=h;
   }
 
@@ -452,12 +451,15 @@
 
   function renderChart(rows){
     var counts={}; for(var i=1;i<=6;i++) counts[i]=0;
-    rows.forEach(function(r){ var lv=parseClass(r[COL.cls]).level; if(counts[lv]!=null) counts[lv]++; else if(lv) counts[lv]=(counts[lv]||0)+1; });
+    var other=0;
+    rows.forEach(function(r){ var lv=parseClass(r[COL.cls]).level; if(lv && counts[lv]!=null) counts[lv]++; else if(lv) counts[lv]=(counts[lv]||0)+1; else other++; });
+    if(other>0) counts['อื่นๆ']=other; // แถวที่ชั้น/ห้องว่างหรือแยกชั้นไม่ได้ — นับรวมไว้ให้ยอดกราฟตรงกับตาราง
     var max=1; Object.keys(counts).forEach(function(k){ if(counts[k]>max) max=counts[k]; });
     var html='';
-    Object.keys(counts).sort(function(a,b){return (+a)-(+b);}).forEach(function(k){
+    Object.keys(counts).sort(function(a,b){ if(a==='อื่นๆ')return 1; if(b==='อื่นๆ')return -1; return (+a)-(+b); }).forEach(function(k){
       var w=Math.round(counts[k]/max*100);
-      html+='<div class="bar-row"><div class="lbl">ม.'+k+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+counts[k]+'</div></div>';
+      var label=(k==='อื่นๆ')?'อื่นๆ':'ม.'+k;
+      html+='<div class="bar-row"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+counts[k]+'</div></div>';
     });
     document.getElementById('gradeChart').innerHTML=html||'<div class="empty-hint">ไม่มีข้อมูล</div>';
   }
@@ -516,7 +518,7 @@
     var rows=applyFilters();
     if(!rows.length){ alert('ไม่มีข้อมูลให้ดาวน์โหลด'); return; }
     var headers=[COL.date,COL.tPrefix,COL.tName,COL.group,COL.code,COL.subject,COL.credits,COL.hours,COL.sem,COL.year,COL.order,COL.seat,COL.sPrefix,COL.sName,COL.cls,COL.periods,COL.present,COL.absent,COL.percent,COL.remark];
-    var esc2=function(v){ v=(v==null?'':String(v)); if(/[",\n]/.test(v)) v='"'+v.replace(/"/g,'""')+'"'; return v; };
+    var esc2=function(v){ v=(v==null?'':String(v)); if(/^[=+\-@\t\r]/.test(v)) v="'"+v; /* กันสูตรแฝงใน Excel */ if(/[",\n]/.test(v)) v='"'+v.replace(/"/g,'""')+'"'; return v; };
     var lines=[headers.map(esc2).join(',')];
     rows.forEach(function(r){ lines.push(headers.map(function(h){ return esc2(r[h]); }).join(',')); });
     var csv='﻿'+lines.join('\r\n'); // BOM กันภาษาไทยเพี้ยนใน Excel
@@ -539,6 +541,7 @@
   }
   function ob(v){ return(v===''||v==null)?'..........':v; }
 
+  // ⚠️ buildDoc/fitNames ชุดนี้ซ้ำกับใน index.html — ถ้าแก้รูปแบบ PDF ต้องแก้คู่กันทั้ง 2 ไฟล์เสมอ
   function buildDoc(d){
     var rows=d.students.filter(function(s){return s.name;}), bodyHtml='', total=Math.max(MIN_DOC_ROWS,rows.length);
     for(var i=0;i<total;i++){
@@ -634,7 +637,7 @@
   }
   function closePdf(){ pdfModal.classList.remove('show'); document.body.style.overflow=''; }
   document.getElementById('closePdfBtn').addEventListener('click', closePdf);
-  pdfModal.addEventListener('click', function(e){ if(e.target===pdfModal) closePdf(); });
+  // หน้า PDF ปิดได้เฉพาะปุ่ม "ปิด" เท่านั้น — กดพื้นที่ว่างรอบๆ ไม่ปิด (กันปิดพลาดตอนกำลังดู/พิมพ์)
   document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
 </script>
 </body>

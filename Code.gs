@@ -16,6 +16,11 @@ function doGet(e) {
   var params = (e && e.parameter) || {};
   var callback = params.callback || 'callback';
   try {
+    // ===== ยืนยันว่าบันทึกสำเร็จจริง (ไม่ต้องใช้รหัสผ่าน — แค่นับแถวของ submission_id ตัวเอง ไม่คืนข้อมูล) =====
+    if (params.action === 'verify') {
+      return jsonp(callback, { result: 'OK', saved: countBySubmissionId(params.sid) });
+    }
+
     var props = PropertiesService.getScriptProperties();
     var pass = props.getProperty('REPORT_PASSWORD') || DEFAULT_REPORT_PASSWORD;
 
@@ -26,8 +31,23 @@ function doGet(e) {
 
     return jsonp(callback, { result: 'OK', rows: readSheet() });
   } catch (err) {
-    return jsonp(callback, { error: 'server', message: err.message });
+    Logger.log('doGet error: ' + err); // เก็บรายละเอียดไว้ฝั่งเซิร์ฟเวอร์ ไม่ส่งกลับ
+    return jsonp(callback, { error: 'server' });
   }
+}
+
+// นับจำนวนแถวที่มี submission_id ตรงกับ id (ใช้ยืนยันว่าบันทึกเข้าชีตจริง)
+function countBySubmissionId(id) {
+  if (!id) return 0;
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName('รายงาน');
+  if (!sheet || sheet.getLastRow() < 2) return 0;
+  var values = sheet.getDataRange().getValues();
+  var n = 0;
+  for (var r = 1; r < values.length; r++) {
+    if (String(values[r][21]) === String(id)) n++; // submission_id = คอลัม 22 (index 21)
+  }
+  return n;
 }
 
 // ห่อผลลัพธ์เป็น JSONP — เลี่ยงปัญหา CORS เวลาเรียกข้ามโดเมน (Netlify -> Apps Script)
@@ -67,8 +87,9 @@ function doPost(e) {
       .createTextOutput(JSON.stringify({ result: 'OK' }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
+    Logger.log('doPost error: ' + err); // เก็บรายละเอียดไว้ฝั่งเซิร์ฟเวอร์ ไม่ส่งกลับ
     return ContentService
-      .createTextOutput(JSON.stringify({ result: 'ERROR', message: err.message }))
+      .createTextOutput(JSON.stringify({ result: 'ERROR' }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
@@ -89,6 +110,10 @@ function removeRowsBySubmissionId(sheet, id) {
 // เขียนข้อมูลลง Google Sheet + กันบันทึกชนกัน
 // บันทึกซ้ำด้วยรหัสเดิม (หน้าเดิมไม่ปิด) = ทับของเก่า | รหัสใหม่ (เปิดหน้าใหม่) = เพิ่มไม่ลบ
 function saveToSheet(data) {
+  // 🛡 กันข้อมูลหาย: ถ้าไม่มีรายชื่อนักเรียน หยุดทันที — อย่าลบของเก่าทิ้งโดยไม่มีอะไรเขียนกลับ
+  if (!data || !Array.isArray(data.students) || data.students.length === 0) {
+    throw new Error('ไม่มีรายชื่อนักเรียน — ยกเลิกการบันทึก (กันข้อมูลเดิมหาย)');
+  }
   var lock = LockService.getScriptLock();
   lock.waitLock(30000); // กันหลายคนบันทึกพร้อมกัน — เข้าทีละคน ข้อมูลไม่ปนกัน
   try {
@@ -120,17 +145,19 @@ function saveToSheet(data) {
     // ถ้าเป็นการบันทึกซ้ำจากหน้าเดิม (รหัสเดิม) → ลบของเก่าทิ้งก่อน แล้วเขียนใหม่ = ทับ
     removeRowsBySubmissionId(sheet, data.submissionId);
 
-    // เขียนข้อมูลนักเรียนแต่ละคน (1 คน = 1 แถว) + แนบ submission_id ท้ายแถว
+    // เตรียมข้อมูลนักเรียนทุกคน (1 คน = 1 แถว) + แนบ submission_id ท้ายแถว
     var timestamp = new Date();
-    data.students.forEach(function(s) {
-      sheet.appendRow([
+    var newRows = data.students.map(function(s) {
+      return [
         timestamp, data.dateInput, data.teacherPrefix, data.teacherName,
         data.subjectGroup, data.subjectCode, data.subjectName, data.credits,
         data.hoursPerWeek, data.semester, data.academicYear,
         s.order, s.seat, s.prefix, s.name, s.classroom,
         s.periods, s.present, s.absent, s.percent, s.remark, (data.submissionId || '')
-      ]);
+      ];
     });
+    // เขียนทีเดียวทั้งชุด (เร็วกว่า appendRow ทีละแถว — ลดการคุยกับ Google เหลือครั้งเดียว)
+    sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, 22).setValues(newRows);
   } finally {
     lock.releaseLock();
   }

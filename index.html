@@ -529,6 +529,7 @@
       <div class="spinner"></div>
       <div class="alert-title" style="color:#6d28d9;">กำลังบันทึก...</div>
       <div class="alert-msg" style="text-align:center;">กรุณารอสักครู่</div>
+      <div class="popup-actions"><button type="button" class="pa-close" id="savingCancelBtn">ยกเลิก</button></div>
     </div>
     <div id="successDone" style="display:none;">
       <div class="alert-icon" style="background:#d1fae5;color:#059669;">✓</div>
@@ -738,7 +739,7 @@
     if(!d.semester){errs.push('ภาคเรียน');mark('semester');}
     if(!d.academicYear){errs.push('ปีการศึกษา');mark('academicYear');}
     // เช็คข้อมูลนักเรียนแต่ละแถว — บังคับ ชื่อ/ชั้น/ห้อง/คาบ/มาเรียน (ยกเว้น เลขที่ + หมายเหตุ)
-    var hasValid=false, rowIncomplete=false;
+    var hasValid=false, rowIncomplete=false, presentOver=false;
     studentBody.querySelectorAll('tr').forEach(function(tr){
       var g=function(f){ var e=tr.querySelector('[data-field="'+f+'"]'); return e?e.value.trim():''; };
       var seat=g('seat'); if(seat==='–') seat='';
@@ -749,10 +750,18 @@
         var e=tr.querySelector('[data-field="'+f+'"]');
         if(e && !e.value.trim()){ e.classList.add('invalid'); miss=true; }
       });
+      // มาเรียนต้องไม่เกินคาบทั้งหมด (กันพิมพ์ผิด + ป้องกัน % เกิน 100)
+      var perN=parseFloat(g('periods')), preN=parseFloat(g('present'));
+      if(!isNaN(perN) && !isNaN(preN) && preN>perN){
+        var pe=tr.querySelector('[data-field=periods]'), se=tr.querySelector('[data-field=present]');
+        if(pe) pe.classList.add('invalid'); if(se) se.classList.add('invalid');
+        presentOver=true;
+      }
       if(miss) rowIncomplete=true; else hasValid=true;
     });
     if(rowIncomplete) errs.push('ข้อมูลนักเรียนให้ครบ (ชื่อ ชั้น/ห้อง คาบ มาเรียน)');
     else if(!hasValid) errs.push('รายชื่อนักเรียนอย่างน้อย 1 คน');
+    if(presentOver) errs.push('มาเรียนมากกว่าคาบทั้งหมด (ตรวจสอบตัวเลข)');
     return errs;
   }
 
@@ -837,29 +846,71 @@
   reviewModal.addEventListener('click', function(e){ if(e.target===reviewModal) closeReview(); });
 
   // กดยืนยันในหน้าตรวจทาน → บันทึกจริง
+  var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
+  var saveCtrl=null, saveCancelled=false;
+
+  // ยิง JSONP ถามผลจาก Apps Script (ใช้ยืนยันว่าบันทึกเข้าชีตจริง) — มี timeout กันค้าง
+  function jsonpGet(params, cb){
+    var name='__cb'+Date.now()+'_'+Math.floor(Math.random()*1000000000);
+    var s=document.createElement('script'), done=false;
+    var timer=setTimeout(function(){ if(!done){ done=true; cleanup(); cb(null); } }, 12000);
+    function cleanup(){ clearTimeout(timer); try{delete window[name];}catch(e){window[name]=undefined;} if(s.parentNode) s.parentNode.removeChild(s); }
+    window[name]=function(dat){ if(done) return; done=true; cleanup(); cb(dat); };
+    var q=[]; for(var k in params){ q.push(encodeURIComponent(k)+'='+encodeURIComponent(params[k])); }
+    q.push('callback='+name);
+    s.src=SHEET_URL+'?'+q.join('&');
+    s.onerror=function(){ if(!done){ done=true; cleanup(); cb(null); } };
+    document.body.appendChild(s);
+  }
+  function showSaveDone(title, msg){
+    document.getElementById('successLoading').style.display='none';
+    document.getElementById('successDone').style.display='';
+    var dt=document.querySelector('#successDone .alert-title'); if(dt) dt.textContent=title;
+    var dm=document.querySelector('#successDone .alert-msg'); if(dm) dm.innerHTML=msg+'<br>ต้องการทำอะไรต่อ';
+  }
+  // ยืนยันว่าข้อมูลเข้าชีตจริงไหม แล้วค่อยขึ้นผลตามจริง
+  function verifySaved(sid){
+    jsonpGet({ action:'verify', sid:sid }, function(data){
+      if(saveCancelled) return; // ผู้ใช้กดยกเลิกไปแล้ว ไม่ต้องเด้งผลกลับ
+      if(data && data.result==='OK' && data.saved>0){
+        setSaved(true);
+        showSaveDone('บันทึกสำเร็จ', 'บันทึกข้อมูล '+data.saved+' รายการ ลง Google Sheet เรียบร้อยแล้ว');
+      } else if(data && data.result==='OK' && data.saved===0){
+        closeSuccess();
+        showToast('บันทึกไม่สำเร็จ ลองกดบันทึกอีกครั้ง','err');
+      } else {
+        // ยืนยันผลไม่ได้ (ระบบยังไม่อัปเดต/เน็ตช้า) — ส่งไปแล้วแต่ยืนยันอัตโนมัติไม่ได้ จึงไม่ฟันธงว่าสำเร็จ
+        setSaved(true);
+        showSaveDone('ส่งข้อมูลแล้ว', 'ส่งข้อมูลไปยังระบบแล้ว แต่ยืนยันผลอัตโนมัติไม่ได้<br>กรุณาเปิดหน้ารายงานตรวจสอบอีกครั้ง');
+      }
+    });
+  }
+
   document.getElementById('reviewConfirmBtn').addEventListener('click', function(){
     var d=pendingData; if(!d) return;
     d.submissionId=SUBMISSION_ID; // แนบรหัสประจำการกรอก ("ใบเดิม"=ทับ / "ใบใหม่"=เพิ่ม)
     closeReview();
+    saveCancelled=false;
     // เปลี่ยน popup ทันที → แสดงสถานะ "กำลังบันทึก" (ไม่มีช่วงว่างให้ผู้ใช้ไปกดอย่างอื่น)
     document.getElementById('successLoading').style.display='';
     document.getElementById('successDone').style.display='none';
     successModal.classList.add('show'); document.body.style.overflow='hidden';
-    var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
-    fetch(SHEET_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(d)
-    }).then(function(){
-      setSaved(true);
-      // เปลี่ยน popup เป็นสถานะ "บันทึกสำเร็จ"
-      document.getElementById('successLoading').style.display='none';
-      document.getElementById('successDone').style.display='';
-    }).catch(function(err){
-      closeSuccess();
-      showToast('บันทึกไม่สำเร็จ: '+err.message,'err');
-    });
+    // 1) ส่งข้อมูล (no-cors ส่งได้ แต่อ่านผลไม่ได้) + timeout 15 วิ กันค้าง
+    saveCtrl=(typeof AbortController!=='undefined') ? new AbortController() : null;
+    var pTimer=setTimeout(function(){ if(saveCtrl) try{ saveCtrl.abort(); }catch(e){} }, 15000);
+    var opts={ method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(d) };
+    if(saveCtrl) opts.signal=saveCtrl.signal;
+    fetch(SHEET_URL, opts)
+      .then(function(){ clearTimeout(pTimer); if(!saveCancelled) verifySaved(d.submissionId); })
+      .catch(function(){ clearTimeout(pTimer); if(!saveCancelled) verifySaved(d.submissionId); }); // 2) แม้ส่งพลาด/ครบเวลา ก็ลองยืนยัน เผื่อข้อมูลถึงชีตแล้ว
+  });
+
+  // ปุ่มยกเลิกระหว่างกำลังบันทึก (กันหน้าค้าง)
+  document.getElementById('savingCancelBtn').addEventListener('click', function(){
+    saveCancelled=true;
+    if(saveCtrl) try{ saveCtrl.abort(); }catch(e){}
+    closeSuccess();
+    showToast('ยกเลิกการบันทึกแล้ว','err');
   });
 
   // ===== Popup สำเร็จ =====
@@ -897,6 +948,7 @@
   }
   function ob(v){ return(v===''||v==null)?'..........':v; }
 
+  // ⚠️ buildDoc/fitNames ชุดนี้ซ้ำกับใน report.html — ถ้าแก้รูปแบบ PDF ต้องแก้คู่กันทั้ง 2 ไฟล์เสมอ
   function buildDoc(d) {
     var rows=d.students.filter(function(s){return s.name;}), bodyHtml='', total=Math.max(MIN_DOC_ROWS,rows.length);
     for(var i=0;i<total;i++){
@@ -987,7 +1039,7 @@
   });
   function closePdf(){ pdfModal.classList.remove('show'); document.body.style.overflow=''; }
   document.getElementById('closePdfBtn').addEventListener('click', closePdf);
-  pdfModal.addEventListener('click', function(e){ if(e.target===pdfModal) closePdf(); });
+  // หน้า PDF ปิดได้เฉพาะปุ่ม "ปิด" เท่านั้น — กดพื้นที่ว่างรอบๆ ไม่ปิด (กันปิดพลาดตอนกำลังดู/พิมพ์)
   document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
 
   // ===== Export CSV (ข้อมูลที่กรอกในฟอร์มตอนนี้) =====
@@ -996,7 +1048,7 @@
     var rows=d.students.filter(function(s){return s.name;});
     if(!rows.length){ showToast('ยังไม่มีรายชื่อนักเรียนให้ส่งออก','err'); return; }
     var headers=['วันที่กรอก','คำนำหน้าครู','ชื่อครู','กลุ่มสาระ','รหัสวิชา','ชื่อรายวิชา','หน่วยกิต','ชั่วโมง/สัปดาห์','ภาคเรียน','ปีการศึกษา','ลำดับที่','เลขที่','คำนำหน้านักเรียน','ชื่อ-สกุล','ชั้น/ห้อง','คาบทั้งหมด','มาเรียน','ขาดเรียน','% การเข้าเรียน','หมายเหตุ'];
-    var q=function(v){ v=(v==null?'':String(v)); if(/[",\n]/.test(v)) v='"'+v.replace(/"/g,'""')+'"'; return v; };
+    var q=function(v){ v=(v==null?'':String(v)); if(/^[=+\-@\t\r]/.test(v)) v="'"+v; /* กันสูตรแฝงใน Excel */ if(/[",\n]/.test(v)) v='"'+v.replace(/"/g,'""')+'"'; return v; };
     var lines=[headers.map(q).join(',')];
     rows.forEach(function(s,i){
       lines.push([d.dateInput,d.teacherPrefix,d.teacherName,d.subjectGroup,d.subjectCode,d.subjectName,d.credits,d.hoursPerWeek,d.semester,d.academicYear,(i+1),s.seat,s.prefix,s.name,s.classroom,s.periods,s.present,s.absent,s.percent,s.remark].map(q).join(','));
