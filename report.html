@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>รายงานนักเรียนเวลาเรียนไม่ถึง 70 % — โรงเรียนชานุมานวิทยาคม</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Prompt:wght@500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root{
+      --purple:#7c3aed; --purple-dark:#6d28d9; --purple-table:#6b21a8;
+      --pink:#db2777; --green:#059669; --green-dark:#047857;
+      --red:#dc2626; --amber:#d97706;
+      --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --field-bg:#fff;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; font-family:'Sarabun',system-ui,sans-serif; color:var(--ink);
+      background:linear-gradient(135deg,#f5f3ff 0%,#fdf2f8 100%); min-height:100vh; padding:20px;
+    }
+    .wrap{ max-width:1400px; margin:0 auto; }
+
+    /* ===== Header ===== */
+    .topbar{
+      background:#fff; border-radius:18px; padding:16px 22px; box-shadow:0 8px 24px rgba(124,58,237,.08);
+      display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:18px;
+    }
+    .topbar img{ height:52px; width:auto; }
+    .topbar .titles{ flex:1; min-width:200px; }
+    .topbar h1{ margin:0; font-family:'Prompt','Sarabun',sans-serif; font-size:20px; color:var(--purple-dark); }
+    .topbar .sub{ font-size:13px; color:var(--muted); margin-top:2px; }
+    .topbar .acts{ display:flex; gap:10px; flex-wrap:wrap; }
+    .btn{ border:none; border-radius:22px; padding:10px 18px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; color:#fff; display:inline-flex; align-items:center; gap:7px; text-decoration:none; transition:transform .12s; }
+    .btn:hover{ transform:translateY(-1px); }
+    .btn-home{ background:linear-gradient(135deg,#3b82f6,#2563eb); }
+    .btn-csv{ background:linear-gradient(135deg,#10b981,#059669); }
+    .btn-out{ background:linear-gradient(135deg,#f87171,#ef4444); }
+    .btn-ghost{ background:#f3f4f6; color:#4b5563; }
+
+    /* ===== KPI cards ===== */
+    .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:18px; }
+    .kpi{ background:#fff; border-radius:16px; padding:16px 18px; box-shadow:0 6px 18px rgba(0,0,0,.05); border-left:5px solid var(--purple); }
+    .kpi.green{ border-color:var(--green); } .kpi.amber{ border-color:var(--amber); }
+    .kpi.red{ border-color:var(--red); } .kpi.pink{ border-color:var(--pink); } .kpi.blue{ border-color:#2563eb; }
+    .kpi .label{ font-size:13px; color:var(--muted); margin-bottom:6px; }
+    .kpi .value{ font-size:30px; font-weight:700; font-family:'Prompt','Sarabun',sans-serif; line-height:1; }
+    .kpi .unit{ font-size:13px; color:var(--muted); font-weight:400; margin-left:4px; }
+
+    /* ===== Panels (chart + top risk) ===== */
+    .panels{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px; }
+    @media(max-width:860px){ .panels{ grid-template-columns:1fr; } }
+    .panel{ background:#fff; border-radius:16px; padding:18px 20px; box-shadow:0 6px 18px rgba(0,0,0,.05); }
+    .panel h3{ margin:0 0 14px; font-size:15px; color:var(--purple-dark); font-family:'Prompt','Sarabun',sans-serif; }
+    .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:9px; font-size:14px; }
+    .bar-row .lbl{ width:42px; color:var(--muted); flex-shrink:0; }
+    .bar-row .track{ flex:1; background:#f3f4f6; border-radius:8px; height:20px; overflow:hidden; }
+    .bar-row .fill{ height:100%; background:linear-gradient(90deg,#a78bfa,#7c3aed); border-radius:8px; transition:width .4s; }
+    .bar-row .num{ width:36px; text-align:right; font-weight:600; flex-shrink:0; }
+    .risk-row{ display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:14px; }
+    .risk-row:last-child{ border-bottom:none; }
+    .risk-row .pct{ font-weight:700; color:var(--red); }
+    .empty-hint{ color:var(--muted); font-size:14px; text-align:center; padding:20px 0; }
+
+    /* ===== Filter bar ===== */
+    .filters{ background:#fff; border-radius:16px; padding:16px 18px; box-shadow:0 6px 18px rgba(0,0,0,.05); margin-bottom:16px; }
+    .filters .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+    .filters label{ display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+    .filters input,.filters select{ width:100%; border:1px solid #d1d5db; border-radius:9px; padding:9px 11px; font-family:inherit; font-size:14px; background:#fff; outline:none; }
+    .filters input:focus,.filters select:focus{ border-color:var(--purple); box-shadow:0 0 0 3px rgba(124,58,237,.12); }
+    .filters .search-wrap{ grid-column:1 / -1; }
+    .filters .foot{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap:wrap; gap:10px; }
+    .filters .count{ font-size:14px; color:var(--muted); }
+    .filters .count b{ color:var(--purple-dark); }
+
+    /* ===== Table ===== */
+    .table-card{ background:#fff; border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,.05); overflow:hidden; }
+    .table-scroll{ overflow-x:auto; }
+    table.data{ width:100%; border-collapse:collapse; min-width:920px; }
+    table.data thead th{ background:var(--purple-table); color:#fff; font-weight:600; font-size:13px; padding:12px 10px; text-align:left; white-space:nowrap; position:sticky; top:0; }
+    table.data tbody td{ padding:10px; border-bottom:1px solid var(--line); font-size:14px; }
+    table.data tbody tr:nth-child(even){ background:#faf9fe; }
+    table.data tbody tr:hover{ background:#f3eefe; }
+    .pct-bad{ color:var(--red); font-weight:700; }
+    table.data thead th.sortable{ cursor:pointer; user-select:none; }
+    table.data thead th.sortable:hover{ background:#581c87; }
+    table.data thead th .arr{ font-size:11px; margin-left:4px; opacity:.9; }
+    .badge{ display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .badge-saved{ background:#d1fae5; color:#047857; }
+    .badge-long{ background:#fee2e2; color:#b91c1c; }
+    .btn-pdf-row{ background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn-pdf-row:hover{ filter:brightness(1.08); }
+
+    /* ===== Loading / gate ===== */
+    .gate{ position:fixed; inset:0; background:linear-gradient(135deg,#7c3aed,#db2777); display:flex; align-items:center; justify-content:center; z-index:300; padding:20px; }
+    .gate-box{ background:#fff; border-radius:20px; padding:34px 30px; width:100%; max-width:380px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    .gate-box img{ height:64px; margin-bottom:14px; }
+    .gate-box h2{ margin:0 0 6px; font-family:'Prompt','Sarabun',sans-serif; font-size:20px; color:var(--purple-dark); }
+    .gate-box p{ margin:0 0 18px; font-size:14px; color:var(--muted); }
+    .gate-box input{ width:100%; border:1px solid #d1d5db; border-radius:10px; padding:12px 14px; font-family:inherit; font-size:16px; text-align:center; outline:none; margin-bottom:12px; }
+    .gate-box input:focus{ border-color:var(--purple); box-shadow:0 0 0 3px rgba(124,58,237,.15); }
+    .gate-box .err{ color:var(--red); font-size:13px; min-height:18px; margin-bottom:8px; }
+    .gate-box button{ width:100%; background:linear-gradient(135deg,#7c3aed,#6d28d9); color:#fff; border:none; border-radius:24px; padding:12px; font-family:inherit; font-size:16px; font-weight:600; cursor:pointer; }
+    .loading{ text-align:center; padding:60px 0; color:var(--muted); font-size:15px; }
+    .hidden{ display:none !important; }
+
+    /* ===== PDF modal + เอกสารราชการ (sync กับ index.html) ===== */
+    .pdf-backdrop{ position:fixed; inset:0; background:rgba(17,24,39,.6); display:none; justify-content:center; padding:78px 16px 40px; z-index:90; overflow-y:auto; }
+    .pdf-backdrop.show{ display:flex; align-items:flex-start; }
+    .float-print,.float-close{ position:fixed; top:22px; border:none; border-radius:28px; padding:12px 24px; font-family:'Sarabun',sans-serif; font-size:16px; font-weight:600; cursor:pointer; z-index:95; box-shadow:0 6px 18px rgba(0,0,0,.25); display:inline-flex; align-items:center; gap:8px; color:#fff; }
+    .float-print{ left:28px; background:linear-gradient(135deg,#10b981,#059669); }
+    .float-close{ right:28px; background:linear-gradient(135deg,#f87171,#ef4444); }
+    .print-hint{ position:fixed; top:70px; left:50%; transform:translateX(-50%); background:rgba(17,24,39,.82); color:#fff; padding:6px 16px; border-radius:20px; font-size:13px; z-index:95; white-space:nowrap; }
+    .doc-paper{ background:#fff; width:210mm; max-width:100%; min-height:287mm; padding:16mm 16mm; box-shadow:0 20px 60px rgba(0,0,0,.3); border-radius:2px; color:#000; font-family:'TH Sarabun New','TH SarabunPSK','Sarabun',serif; font-size:16pt; line-height:1.5; }
+    .od-date{ text-align:right; font-weight:700; margin:14px 0 12px; }
+    .od-para{ text-indent:2.5em; margin-bottom:14px; line-height:1.9; }
+    .od-para b{ font-weight:700; }
+    .od-table{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:14pt; }
+    .od-table th,.od-table td{ border:1px solid #000; padding:5px 4px; text-align:center; vertical-align:middle; word-break:break-word; overflow-wrap:break-word; box-sizing:border-box; }
+    .od-table thead th{ background:#e5e7eb; font-weight:700; font-size:11pt; line-height:1.25; }
+    .od-table td.od-name{ text-align:left; padding-left:6px; white-space:nowrap; word-break:normal; overflow-wrap:normal; overflow:hidden; }
+    .od-empty-row td{ height:30px; }
+    .od-sign{ margin-top:20px; font-size:15pt; }
+    .od-sign .intro{ text-indent:2.5em; margin-bottom:24px; }
+    .od-sign .sign-block{ text-align:center; float:right; min-width:260px; width:max-content; max-width:100%; line-height:2; white-space:nowrap; }
+    .od-sign .sign-block::after{ content:''; display:block; clear:both; }
+    .od-sign-clear{ clear:both; }
+
+    @media print{
+      body{ background:#fff !important; padding:0 !important; }
+      .wrap,.float-print,.float-close,.print-hint{ display:none !important; }
+      .pdf-backdrop{ position:static !important; display:block !important; background:none !important; padding:0 !important; overflow:visible !important; }
+      .doc-paper{ position:static !important; box-shadow:none !important; border-radius:0 !important; width:100% !important; max-width:none !important; min-height:0 !important; padding:0 !important; }
+      .od-table{ page-break-inside:auto; }
+      .od-table thead{ display:table-header-group; }
+      .od-table tr{ page-break-inside:avoid; }
+      @page{ size:A4 portrait; margin:14mm; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ===== หน้ารหัสผ่าน ===== -->
+<div class="gate" id="gate">
+  <div class="gate-box">
+    <img src="logo.png" alt="โลโก้" onerror="this.style.display='none'">
+    <h2>รายงานนักเรียน</h2>
+    <p>กรุณากรอกรหัสผ่านเพื่อเข้าดูข้อมูล</p>
+    <input type="password" id="gatePass" placeholder="รหัสผ่าน" autocomplete="current-password">
+    <div class="err" id="gateErr"></div>
+    <button id="gateBtn">เข้าสู่ระบบ</button>
+  </div>
+</div>
+
+<!-- ===== เนื้อหาหลัก ===== -->
+<div class="wrap hidden" id="main">
+  <div class="topbar">
+    <img src="logo.png" alt="โลโก้" onerror="this.style.display='none'">
+    <div class="titles">
+      <h1>รายงานนักเรียนที่มีเวลาเรียนไม่ถึง 70 %</h1>
+      <div class="sub">โรงเรียนชานุมานวิทยาคม · ข้อมูลจากครูผู้สอน (ดูอย่างเดียว)</div>
+    </div>
+    <div class="acts">
+      <a class="btn btn-home" href="index.html">＋ กรอกฟอร์มใหม่</a>
+      <button class="btn btn-csv" id="csvBtn">⬇ Export CSV</button>
+      <button class="btn btn-out" id="outBtn">ออกจากระบบ</button>
+    </div>
+  </div>
+
+  <div id="loading" class="loading">กำลังโหลดข้อมูล...</div>
+
+  <div id="dash" class="hidden">
+    <!-- KPI -->
+    <div class="kpis" id="kpis"></div>
+
+    <!-- กราฟ + กลุ่มเสี่ยง -->
+    <div class="panels">
+      <div class="panel">
+        <h3>จำนวนนักเรียนแยกตามระดับชั้น</h3>
+        <div id="gradeChart"></div>
+      </div>
+      <div class="panel">
+        <h3>นักเรียนกลุ่มเสี่ยงสุด (% เข้าเรียนต่ำสุด)</h3>
+        <div id="riskList"></div>
+      </div>
+    </div>
+
+    <!-- ตัวกรอง -->
+    <div class="filters">
+      <div class="grid">
+        <div class="search-wrap">
+          <label>ค้นหา (ชื่อนักเรียน / ครู / วิชา / รหัส / ห้อง)</label>
+          <input type="text" id="fSearch" placeholder="พิมพ์คำค้นหา...">
+        </div>
+        <div><label>ระดับชั้น</label><select id="fGrade"></select></div>
+        <div><label>ห้อง</label><select id="fRoom"></select></div>
+        <div><label>ครูผู้สอน</label><select id="fTeacher"></select></div>
+        <div><label>รายวิชา</label><select id="fSubject"></select></div>
+        <div><label>ภาคเรียน / ปีการศึกษา</label><select id="fTerm"></select></div>
+        <div><label>หมายเหตุ</label><select id="fRemark"></select></div>
+      </div>
+      <div class="foot">
+        <div class="count">แสดง <b id="cntShown">0</b> จากทั้งหมด <b id="cntAll">0</b> รายการ</div>
+        <button class="btn btn-ghost" id="clearBtn">ล้างการกรอง</button>
+      </div>
+    </div>
+
+    <!-- ตาราง -->
+    <div class="table-card">
+      <div class="table-scroll">
+        <table class="data">
+          <thead>
+            <tr id="headRow">
+              <th class="sortable" data-key="date">วันที่<span class="arr"></span></th>
+              <th class="sortable" data-key="teacher">ครูผู้สอน<span class="arr"></span></th>
+              <th class="sortable" data-key="subject">รายวิชา<span class="arr"></span></th>
+              <th class="sortable" data-key="seat">เลขที่<span class="arr"></span></th>
+              <th class="sortable" data-key="name">ชื่อ – สกุล<span class="arr"></span></th>
+              <th class="sortable" data-key="cls">ชั้น/ห้อง<span class="arr"></span></th>
+              <th class="sortable" data-key="percent">% เข้าเรียน<span class="arr"></span></th>
+              <th class="sortable" data-key="remark">หมายเหตุ<span class="arr"></span></th>
+              <th class="sortable" data-key="status">สถานะ<span class="arr"></span></th>
+              <th>เอกสาร</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== PDF Modal ===== -->
+<div class="pdf-backdrop" id="pdfModal">
+  <button type="button" class="float-print" id="printBtn">🖨 พิมพ์ / บันทึก PDF</button>
+  <div class="print-hint">ในหน้าต่างพิมพ์ เลือกกระดาษ A4 และเอาเครื่องหมายถูก "หัวกระดาษและท้ายกระดาษ" ออก</div>
+  <button type="button" class="float-close" id="closePdfBtn">ปิด</button>
+  <div class="doc-paper" id="printArea"></div>
+</div>
+
+<script>
+  // ====== ค่าคงที่ ======
+  var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
+  var THRESHOLD=70, MIN_DOC_ROWS=10;
+  var THAI_MONTHS=['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+  var NAME_MAX_FS=18.6667, NAME_MIN_FS=8;
+  // ชื่อหัวคอลัมในชีต (ต้องตรงกับ Code.gs)
+  var COL={ ts:'timestamp', date:'วันที่กรอก', tPrefix:'คำนำหน้าครู', tName:'ชื่อครู', group:'กลุ่มสาระ',
+    code:'รหัสวิชา', subject:'ชื่อรายวิชา', credits:'หน่วยกิต', hours:'ชั่วโมง/สัปดาห์', sem:'ภาคเรียน', year:'ปีการศึกษา',
+    order:'ลำดับที่', seat:'เลขที่', sPrefix:'คำนำหน้านักเรียน', sName:'ชื่อ-สกุล', cls:'ชั้น/ห้อง',
+    periods:'คาบทั้งหมด', present:'มาเรียน', absent:'ขาดเรียน', percent:'% การเข้าเรียน', remark:'หมายเหตุ' };
+
+  var allRows=[];
+
+  // ====== JSONP (เลี่ยง CORS) ======
+  var jsonpId=0;
+  function jsonp(params, cb){
+    jsonpId++;
+    var name='__cb'+jsonpId+'_'+(new Date().getTime());
+    var s=document.createElement('script');
+    var done=false;
+    window[name]=function(data){ done=true; cleanup(); cb(data); };
+    function cleanup(){ try{ delete window[name]; }catch(e){ window[name]=undefined; } if(s.parentNode) s.parentNode.removeChild(s); }
+    var q=[]; for(var k in params){ q.push(encodeURIComponent(k)+'='+encodeURIComponent(params[k])); }
+    q.push('callback='+name);
+    s.src=SHEET_URL+'?'+q.join('&');
+    s.onerror=function(){ if(!done){ cleanup(); cb({error:'network'}); } };
+    document.body.appendChild(s);
+    setTimeout(function(){ if(!done){ cleanup(); cb({error:'timeout'}); } }, 20000);
+  }
+
+  // ====== Password gate ======
+  var gate=document.getElementById('gate'), main=document.getElementById('main');
+  function tryLogin(pass, onFail){
+    jsonp({ key:pass }, function(data){
+      if(data && data.result==='OK'){
+        allRows=data.rows||[];
+        gate.classList.add('hidden'); main.classList.remove('hidden');
+        initApp();
+      } else if(data && data.error==='unauthorized'){
+        onFail('รหัสผ่านไม่ถูกต้อง');
+      } else {
+        onFail('เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง');
+      }
+    });
+  }
+  document.getElementById('gateBtn').addEventListener('click', function(){
+    var p=document.getElementById('gatePass').value.trim();
+    var err=document.getElementById('gateErr');
+    if(!p){ err.textContent='กรุณากรอกรหัสผ่าน'; return; }
+    err.textContent='กำลังตรวจสอบ...';
+    this.disabled=true;
+    var btn=this;
+    tryLogin(p, function(msg){ err.textContent=msg; btn.disabled=false; });
+  });
+  document.getElementById('gatePass').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('gateBtn').click(); });
+  document.getElementById('outBtn').addEventListener('click', function(){
+    sessionStorage.removeItem('reportPass');
+    location.reload();
+  });
+
+  // ไม่จำรหัส — เปิดหน้านี้ต้องกรอกรหัสผ่านใหม่ทุกครั้ง (ปลอดภัยสุด)
+
+  // ====== App ======
+  function uniq(arr){ var s={},o=[]; arr.forEach(function(v){ if(v!=='' && v!=null && !s[v]){ s[v]=1; o.push(v); } }); return o; }
+  function parseClass(c){ c=String(c||'').trim(); var t=c.replace('ม.',''); var p=t.split('/'); return { level:(p[0]||'').trim(), room:(p[1]||'').trim() }; }
+  function num(v){ var n=parseFloat(v); return isNaN(n)?null:n; }
+
+  function initApp(){
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('dash').classList.remove('hidden');
+    buildFilterOptions();
+    ['fSearch','fRoom','fTeacher','fSubject','fTerm','fRemark'].forEach(function(id){
+      document.getElementById(id).addEventListener('input', render);
+      document.getElementById(id).addEventListener('change', render);
+    });
+    // เลือกระดับชั้น → อัปเดตรายการห้องตามชั้นนั้น
+    document.getElementById('fGrade').addEventListener('change', function(){ updateRoomOptions(); render(); });
+    document.getElementById('clearBtn').addEventListener('click', function(){
+      document.getElementById('fSearch').value='';
+      ['fGrade','fSubject','fTeacher','fTerm','fRemark'].forEach(function(id){ document.getElementById(id).value=''; });
+      updateRoomOptions(); // รีเซ็ตห้อง (ปิดไว้)
+      render();
+    });
+    document.getElementById('csvBtn').addEventListener('click', exportCSV);
+    document.getElementById('headRow').addEventListener('click', function(e){
+      var th=e.target.closest('th.sortable'); if(!th) return;
+      var k=th.getAttribute('data-key');
+      if(sortState.key===k){ sortState.dir*=-1; } else { sortState.key=k; sortState.dir=1; }
+      updateArrows(); render();
+    });
+    render();
+  }
+
+  function buildFilterOptions(){
+    var grades=uniq(allRows.map(function(r){ return parseClass(r[COL.cls]).level; })).sort();
+    var teachers=uniq(allRows.map(function(r){ return ((r[COL.tPrefix]||'')+r[COL.tName]).replace(/\s+/g,' ').trim(); })).sort();
+    var subjects=uniq(allRows.map(function(r){ return r[COL.subject]; })).sort();
+    var terms=uniq(allRows.map(function(r){ return termKey(r); })).sort();
+    var remarks=uniq(allRows.map(function(r){ return r[COL.remark]; })).sort();
+    fill('fGrade','ทุกระดับชั้น', grades.map(function(g){ return {v:g, t:'ม.'+g}; }));
+    fill('fTeacher','ครูทุกคน', teachers.map(function(t){ return {v:t, t:t}; }));
+    fill('fSubject','ทุกรายวิชา', subjects.map(function(s){ return {v:s, t:s}; }));
+    fill('fTerm','ทุกภาคเรียน', terms.map(function(t){ return {v:t, t:t}; }));
+    fill('fRemark','ทุกหมายเหตุ', remarks.map(function(r){ return {v:r, t:r}; }));
+    updateRoomOptions(); // ห้อง: ปิดไว้จนกว่าจะเลือกระดับชั้น
+  }
+
+  // ห้องขึ้นกับระดับชั้น — เลือกชั้นก่อนถึงเลือกห้องได้ (กันสับสน 5/6 กับ 6/6)
+  function updateRoomOptions(){
+    var g=document.getElementById('fGrade').value;
+    var fRoom=document.getElementById('fRoom');
+    if(!g){ fRoom.innerHTML='<option value="">เลือกระดับชั้นก่อน</option>'; fRoom.disabled=true; return; }
+    var rooms=uniq(allRows.filter(function(r){ return parseClass(r[COL.cls]).level===g; })
+      .map(function(r){ return parseClass(r[COL.cls]).room; })).sort(function(a,b){ return (+a)-(+b); });
+    fill('fRoom','ทุกห้องใน ม.'+g, rooms.map(function(rm){ return {v:rm, t:'ม.'+g+'/'+rm}; }));
+    fRoom.disabled=false;
+  }
+  function termKey(r){ var s=r[COL.sem], y=r[COL.year]; if(!s&&!y) return ''; return 'ภาคเรียน '+(s||'-')+' ปีการศึกษา '+(y||'-'); }
+  function fill(id, allLabel, opts){
+    var sel=document.getElementById(id);
+    var h='<option value="">'+allLabel+'</option>';
+    opts.forEach(function(o){ if(o.v!=='' && o.v!=null) h+='<option value="'+String(o.v).replace(/"/g,'&quot;')+'">'+o.t+'</option>'; });
+    sel.innerHTML=h;
+  }
+
+  function applyFilters(){
+    var q=document.getElementById('fSearch').value.trim().toLowerCase();
+    var g=document.getElementById('fGrade').value;
+    var rm=document.getElementById('fRoom').value;
+    var tc=document.getElementById('fTeacher').value;
+    var sub=document.getElementById('fSubject').value;
+    var tm=document.getElementById('fTerm').value;
+    var rk=document.getElementById('fRemark').value;
+    return allRows.filter(function(r){
+      var pc=parseClass(r[COL.cls]);
+      if(g && pc.level!==g) return false;
+      if(rm && pc.room!==rm) return false;
+      if(tc && ((r[COL.tPrefix]||'')+r[COL.tName]).replace(/\s+/g,' ').trim()!==tc) return false;
+      if(sub && r[COL.subject]!==sub) return false;
+      if(tm && termKey(r)!==tm) return false;
+      if(rk && r[COL.remark]!==rk) return false;
+      if(q){
+        var hay=[r[COL.sName],(r[COL.tPrefix]||'')+r[COL.tName],r[COL.subject],r[COL.code],r[COL.cls],r[COL.seat],r[COL.group]].join(' ').toLowerCase();
+        if(hay.indexOf(q)<0) return false;
+      }
+      return true;
+    });
+  }
+
+  // ===== เรียงลำดับตามคอลัม =====
+  var COLSORT={
+    date:{ get:function(r){return r[COL.date]||r[COL.ts];}, type:'date' },
+    teacher:{ get:function(r){return (r[COL.tPrefix]||'')+r[COL.tName];}, type:'str' },
+    subject:{ get:function(r){return r[COL.subject];}, type:'str' },
+    seat:{ get:function(r){return r[COL.seat];}, type:'num' },
+    name:{ get:function(r){return (r[COL.sPrefix]||'')+r[COL.sName];}, type:'str' },
+    cls:{ get:function(r){return r[COL.cls];}, type:'str' },
+    percent:{ get:function(r){return r[COL.percent];}, type:'num' },
+    remark:{ get:function(r){return r[COL.remark];}, type:'str' },
+    status:{ get:function(){return 'บันทึกแล้ว';}, type:'str' }
+  };
+  var sortState={ key:null, dir:1 };
+  function dnum(v){ if(!v) return 0; var t=new Date(String(v)).getTime(); return isNaN(t)?0:t; }
+  function applySort(rows){
+    if(!sortState.key || !COLSORT[sortState.key]) return rows;
+    var c=COLSORT[sortState.key], dir=sortState.dir, arr=rows.slice();
+    arr.sort(function(a,b){
+      var va=c.get(a), vb=c.get(b);
+      if(c.type==='num'){ var na=num(va), nb=num(vb); na=(na==null?-Infinity:na); nb=(nb==null?-Infinity:nb); return (na-nb)*dir; }
+      if(c.type==='date'){ return (dnum(va)-dnum(vb))*dir; }
+      return String(va==null?'':va).localeCompare(String(vb==null?'':vb),'th',{numeric:true})*dir;
+    });
+    return arr;
+  }
+  function updateArrows(){
+    var ths=document.querySelectorAll('#headRow th.sortable');
+    for(var i=0;i<ths.length;i++){
+      var a=ths[i].querySelector('.arr');
+      a.textContent=(ths[i].getAttribute('data-key')===sortState.key)?(sortState.dir>0?' ▲':' ▼'):'';
+    }
+  }
+
+  function render(){
+    var rows=applySort(applyFilters());
+    renderKPI(rows); renderChart(rows); renderRisk(rows); renderTable(rows);
+    document.getElementById('cntShown').textContent=rows.length;
+    document.getElementById('cntAll').textContent=allRows.length;
+  }
+
+  function renderKPI(rows){
+    var sKey=function(r){ return String(r[COL.sName]||'').replace(/\s+/g,' ').trim(); }; // ระบุตัวนักเรียนจากชื่อ-สกุลล้วน (ไม่เอาคำนำหน้ามาทำให้แยก) + ยุบช่องว่าง
+    var students=uniq(rows.map(sKey)).length;                                    // นับนักเรียนไม่ซ้ำ
+    var reports=uniq(rows.map(function(r){ return r[COL.ts]; })).length;
+    var teachers=uniq(rows.map(function(r){ return ((r[COL.tPrefix]||'')+r[COL.tName]).replace(/\s+/g,' ').trim(); })).length;
+    var subjects=uniq(rows.map(function(r){ return String(r[COL.code]||r[COL.subject]||'').replace(/\s+/g,'').trim(); })).length; // นับจากรหัสวิชา + ยุบช่องว่าง
+    var pcts=rows.map(function(r){ return num(r[COL.percent]); }).filter(function(v){ return v!=null; });
+    var avg=pcts.length? (pcts.reduce(function(a,b){return a+b;},0)/pcts.length) : null;
+    var longAbsent=uniq(rows.filter(function(r){ return r[COL.remark]==='ขาดเรียนนาน'; }).map(sKey)).length; // ขาดเรียนนาน ไม่ซ้ำ
+    var cards=[
+      {label:'รายชื่อนักเรียนทั้งหมด', value:students, unit:'คน', cls:''},
+      {label:'จำนวนใบรายงาน', value:reports, unit:'ใบ', cls:'blue'},
+      {label:'ครูที่ส่งรายงาน', value:teachers, unit:'คน', cls:'green'},
+      {label:'รายวิชา', value:subjects, unit:'วิชา', cls:'pink'},
+      {label:'% เข้าเรียนเฉลี่ย', value:(avg==null?'–':avg.toFixed(1)), unit:'%', cls:'amber'},
+      {label:'ขาดเรียนนาน', value:longAbsent, unit:'คน', cls:'red'}
+    ];
+    document.getElementById('kpis').innerHTML=cards.map(function(c){
+      return '<div class="kpi '+c.cls+'"><div class="label">'+c.label+'</div><div class="value">'+c.value+'<span class="unit">'+c.unit+'</span></div></div>';
+    }).join('');
+  }
+
+  function renderChart(rows){
+    var counts={}; for(var i=1;i<=6;i++) counts[i]=0;
+    rows.forEach(function(r){ var lv=parseClass(r[COL.cls]).level; if(counts[lv]!=null) counts[lv]++; else if(lv) counts[lv]=(counts[lv]||0)+1; });
+    var max=1; Object.keys(counts).forEach(function(k){ if(counts[k]>max) max=counts[k]; });
+    var html='';
+    Object.keys(counts).sort(function(a,b){return (+a)-(+b);}).forEach(function(k){
+      var w=Math.round(counts[k]/max*100);
+      html+='<div class="bar-row"><div class="lbl">ม.'+k+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+counts[k]+'</div></div>';
+    });
+    document.getElementById('gradeChart').innerHTML=html||'<div class="empty-hint">ไม่มีข้อมูล</div>';
+  }
+
+  function renderRisk(rows){
+    var withPct=rows.filter(function(r){ return r[COL.remark]!=='ขาดเรียนนาน'; }) // ตัดคนที่ระบุ "ขาดเรียนนาน" ออก เหลือเฉพาะที่ต้องจับตาเพิ่ม
+      .map(function(r){ return {r:r, p:num(r[COL.percent])}; })
+      .filter(function(x){ return x.p!=null && x.p>0; }); // ไม่นับ 0%
+    withPct.sort(function(a,b){ return a.p-b.p; });
+    var top=withPct.slice(0,5);
+    if(!top.length){ document.getElementById('riskList').innerHTML='<div class="empty-hint">ไม่มีข้อมูล</div>'; return; }
+    document.getElementById('riskList').innerHTML=top.map(function(x){
+      var r=x.r;
+      return '<div class="risk-row"><span>'+esc((r[COL.sPrefix]||'')+r[COL.sName])+' <span style="color:#9ca3af">('+esc(r[COL.cls])+')</span></span><span class="pct">'+x.p.toFixed(1)+'%</span></div>';
+    }).join('');
+  }
+
+  function fmtDate(v){
+    if(!v) return '';
+    var s=String(v);
+    // ถ้าเป็น ISO datetime (timestamp) → ตัดเอาเฉพาะวันที่
+    if(s.indexOf('T')>0){ var d=s.split('T')[0].split('-'); if(d.length===3) return d[2]+'/'+d[1]+'/'+(parseInt(d[0],10)+543); }
+    if(/^\d{4}-\d{2}-\d{2}/.test(s)){ var p=s.substr(0,10).split('-'); return p[2]+'/'+p[1]+'/'+(parseInt(p[0],10)+543); }
+    return s;
+  }
+
+  function renderTable(rows){
+    var tb=document.getElementById('tbody');
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="10" class="empty-hint">ไม่พบข้อมูลตามเงื่อนไข</td></tr>'; return; }
+    tb.innerHTML=rows.map(function(r){
+      var p=num(r[COL.percent]);
+      var pCls=(p!=null && p<THRESHOLD)?' class="pct-bad"':'';
+      var remark=r[COL.remark]||'';
+      var remHtml=remark==='ขาดเรียนนาน' ? '<span class="badge badge-long">ขาดเรียนนาน</span>' : esc(remark);
+      var ts=String(r[COL.ts]||'').replace(/"/g,'&quot;');
+      return '<tr>'+
+        '<td>'+esc(fmtDate(r[COL.date]||r[COL.ts]))+'</td>'+
+        '<td>'+esc((r[COL.tPrefix]||'')+r[COL.tName])+'</td>'+
+        '<td>'+esc(r[COL.subject])+'<div style="font-size:12px;color:#9ca3af">'+esc(r[COL.code])+'</div></td>'+
+        '<td style="text-align:center">'+esc(r[COL.seat])+'</td>'+
+        '<td>'+esc((r[COL.sPrefix]||'')+r[COL.sName])+'</td>'+
+        '<td style="text-align:center">'+esc(r[COL.cls])+'</td>'+
+        '<td style="text-align:center"'+pCls+'>'+(p!=null?p.toFixed(1):esc(r[COL.percent]))+'</td>'+
+        '<td>'+remHtml+'</td>'+
+        '<td><span class="badge badge-saved">บันทึกแล้ว</span></td>'+
+        '<td><button class="btn-pdf-row" data-ts="'+ts+'">📄 PDF</button></td>'+
+      '</tr>';
+    }).join('');
+    tb.querySelectorAll('.btn-pdf-row').forEach(function(b){
+      b.addEventListener('click', function(){ openPdfForReport(this.getAttribute('data-ts')); });
+    });
+  }
+
+  // ====== Export CSV ======
+  function exportCSV(){
+    var rows=applyFilters();
+    if(!rows.length){ alert('ไม่มีข้อมูลให้ดาวน์โหลด'); return; }
+    var headers=[COL.date,COL.tPrefix,COL.tName,COL.group,COL.code,COL.subject,COL.credits,COL.hours,COL.sem,COL.year,COL.order,COL.seat,COL.sPrefix,COL.sName,COL.cls,COL.periods,COL.present,COL.absent,COL.percent,COL.remark];
+    var esc2=function(v){ v=(v==null?'':String(v)); if(/[",\n]/.test(v)) v='"'+v.replace(/"/g,'""')+'"'; return v; };
+    var lines=[headers.map(esc2).join(',')];
+    rows.forEach(function(r){ lines.push(headers.map(function(h){ return esc2(r[h]); }).join(',')); });
+    var csv='﻿'+lines.join('\r\n'); // BOM กันภาษาไทยเพี้ยนใน Excel
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url; a.download='รายงานนักเรียน_'+new Date().toISOString().substr(0,10)+'.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+
+  // ====== PDF (sync logic กับ index.html) ======
+  var pdfModal=document.getElementById('pdfModal'), printArea=document.getElementById('printArea');
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function thaiDate(iso){
+    if(!iso) return 'วันที่ ............ เดือน ........................ พ.ศ. ............';
+    var s=String(iso); if(s.indexOf('T')>0) s=s.split('T')[0];
+    var p=s.split('-'); if(p.length<3) return s;
+    var y=parseInt(p[0],10)+543, m=parseInt(p[1],10), d=parseInt(p[2],10);
+    return 'วันที่ '+d+' เดือน '+(THAI_MONTHS[m]||'')+' พ.ศ. '+y;
+  }
+  function ob(v){ return(v===''||v==null)?'..........':v; }
+
+  function buildDoc(d){
+    var rows=d.students.filter(function(s){return s.name;}), bodyHtml='', total=Math.max(MIN_DOC_ROWS,rows.length);
+    for(var i=0;i<total;i++){
+      var s=rows[i];
+      if(s){
+        var remStyle='text-align:left;padding-left:6px;'+(s.remark==='ขาดเรียนนาน'?'color:#dc2626;font-weight:700;':'');
+        var fullName=(s.prefix||'')+s.name;
+        bodyHtml+='<tr><td>'+(i+1)+'</td><td class="od-name" style="font-size:18.6667px;">'+esc(fullName)+'</td><td>'+esc(s.seat)+'</td><td>'+esc(s.classroom)+'</td><td>'+esc(s.periods)+'</td><td>'+esc(s.present)+'</td><td>'+esc(s.absent)+'</td><td>'+esc(s.percent)+'</td><td style="'+remStyle+'">'+esc(s.remark)+'</td></tr>';
+      } else {
+        bodyHtml+='<tr class="od-empty-row"><td>'+(i+1)+'</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+      }
+    }
+    var teacherFull=esc((d.teacherPrefix||'')+d.teacherName);
+    return ''+
+      '<div style="position:relative;text-align:center;margin-bottom:10px;min-height:96px;">'+
+        '<div style="position:absolute;top:2px;right:0;text-align:right;font-size:14pt;font-weight:700;line-height:1.4;">โรงเรียนชานุมานวิทยาคม</div>'+
+        '<img src="logo.png" style="height:63px;width:auto;display:inline-block;" alt="โลโก้" onerror="this.style.display=\'none\';">'+
+        '<div style="font-size:18pt;font-weight:700;line-height:1.35;margin-top:4px;">แบบส่งรายชื่อนักเรียนที่มีเวลาเรียนไม่ถึง '+THRESHOLD+' %</div>'+
+      '</div>'+
+      '<div class="od-date">'+thaiDate(d.dateInput)+'</div>'+
+      '<div class="od-para">ข้าพเจ้า <b>'+esc((d.teacherPrefix||'')+d.teacherName)+'</b> '+
+        'กลุ่มสาระการเรียนรู้ <b>'+esc(ob(d.subjectGroup))+'</b> '+
+        'ได้รับมอบหมายให้ปฏิบัติหน้าที่สอนในรายวิชา <b>'+esc(ob(d.subjectName))+'</b> '+
+        'รหัสวิชา <b>'+esc(ob(d.subjectCode))+'</b> '+
+        'เวลาเรียนต่อสัปดาห์ <b>'+esc(ob(d.hoursPerWeek))+'</b> ชั่วโมง '+
+        'ประจำภาคเรียนที่ <b>'+esc(ob(d.semester))+'</b> '+
+        'ปีการศึกษา <b>'+esc(ob(d.academicYear))+'</b> '+
+        'มีนักเรียนเวลาเรียนไม่ถึง '+THRESHOLD+' % ดังต่อไปนี้</div>'+
+      '<table class="od-table">'+
+        '<colgroup><col style="width:5%"><col style="width:40%"><col style="width:6%"><col style="width:7%"><col style="width:6%"><col style="width:6%"><col style="width:6%"><col style="width:9%"><col style="width:15%"></colgroup>'+
+        '<thead>'+
+          '<tr>'+
+            '<th rowspan="2">ที่</th><th rowspan="2">ชื่อ – สกุล</th><th rowspan="2" style="white-space:nowrap">เลขที่</th><th rowspan="2">ชั้น/ห้อง</th>'+
+            '<th colspan="3">จำนวนชั่วโมง</th>'+
+            '<th rowspan="2">%<br/>การเข้าเรียน</th><th rowspan="2">หมายเหตุ</th>'+
+          '</tr>'+
+          '<tr><th>ทั้งหมด</th><th>มาเรียน</th><th>ขาดเรียน</th></tr>'+
+        '</thead>'+
+        '<tbody>'+bodyHtml+'</tbody>'+
+      '</table>'+
+      '<div class="od-sign">'+
+        '<div class="intro">จึงเรียนมาเพื่อโปรดพิจารณา</div>'+
+        '<div class="sign-block">'+
+          '<div>ลงชื่อ................................................</div>'+
+          '<div>('+teacherFull+')</div>'+
+          '<div>ครูประจำวิชา</div>'+
+        '</div>'+
+        '<div class="od-sign-clear"></div>'+
+      '</div>';
+  }
+
+  function fitNames(){
+    var cells=printArea.querySelectorAll('td.od-name');
+    if(!cells.length) return;
+    var cv=fitNames._cv||(fitNames._cv=document.createElement('canvas'));
+    var ctx=cv.getContext('2d');
+    cells.forEach(function(td){
+      td.style.fontSize=NAME_MAX_FS+'px';
+      var cs=getComputedStyle(td);
+      var padL=parseFloat(cs.paddingLeft)||0, padR=parseFloat(cs.paddingRight)||0;
+      var avail=td.clientWidth-padL-padR-2;
+      if(avail<=0) return;
+      var text=td.textContent||'';
+      ctx.font='400 '+NAME_MAX_FS+'px '+cs.fontFamily;
+      var w=ctx.measureText(text).width;
+      var fs=(w>avail) ? Math.max(NAME_MIN_FS, NAME_MAX_FS*avail/w) : NAME_MAX_FS;
+      td.style.fontSize=fs.toFixed(2)+'px';
+    });
+  }
+
+  // รวมแถวที่ timestamp เดียวกัน = 1 ใบรายงาน แล้วสร้าง PDF
+  function openPdfForReport(ts){
+    var group=allRows.filter(function(r){ return String(r[COL.ts])===String(ts); });
+    if(!group.length) return;
+    group.sort(function(a,b){ return (parseInt(a[COL.order],10)||0)-(parseInt(b[COL.order],10)||0); });
+    var h=group[0];
+    var d={
+      dateInput:h[COL.date], teacherPrefix:h[COL.tPrefix], teacherName:h[COL.tName],
+      subjectGroup:h[COL.group], subjectCode:h[COL.code], subjectName:h[COL.subject],
+      hoursPerWeek:h[COL.hours], semester:h[COL.sem], academicYear:h[COL.year],
+      students:group.map(function(r){ return {
+        prefix:r[COL.sPrefix], name:r[COL.sName], seat:r[COL.seat], classroom:r[COL.cls],
+        periods:r[COL.periods], present:r[COL.present], absent:r[COL.absent],
+        percent:r[COL.percent], remark:r[COL.remark]
+      }; })
+    };
+    printArea.innerHTML=buildDoc(d);
+    pdfModal.classList.add('show'); document.body.style.overflow='hidden';
+    var go=function(){ requestAnimationFrame(function(){ requestAnimationFrame(fitNames); }); };
+    if(document.fonts && document.fonts.load){
+      Promise.all([ document.fonts.load('400 18px "TH Sarabun New"'), document.fonts.load('400 18px "Sarabun"') ]).then(go).catch(go);
+    } else { go(); }
+  }
+  function closePdf(){ pdfModal.classList.remove('show'); document.body.style.overflow=''; }
+  document.getElementById('closePdfBtn').addEventListener('click', closePdf);
+  pdfModal.addEventListener('click', function(e){ if(e.target===pdfModal) closePdf(); });
+  document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
+</script>
+</body>
+</html>

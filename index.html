@@ -37,6 +37,7 @@
       background: #fff; border-radius: 20px;
       box-shadow: 0 10px 40px rgba(91,33,182,.12);
       padding: 30px 34px 34px; margin-top: 18px;
+      position: relative;
     }
 
     /* ===== Header banner ===== */
@@ -73,8 +74,8 @@
     .helper-text { color: var(--muted); font-size: 13px; margin: -8px 0 16px 0; }
     .helper-text b { color: var(--purple-dark); font-weight: 600; }
     input[type="text"], input[type="number"], input[type="date"], select, textarea {
-      font-family: inherit; font-size: 15px; color: var(--ink); background: var(--field-bg);
-      border: 1px solid #d1d5db; border-radius: 9px; padding: 8px 11px; outline: none;
+      font-family: inherit; font-size: 15px; line-height: 1.6; color: var(--ink); background: var(--field-bg);
+      border: 1px solid #d1d5db; border-radius: 9px; padding: 10px 11px; outline: none;
       transition: border-color .15s, box-shadow .15s; caret-color: var(--purple);
     }
     input:focus, select:focus, textarea:focus {
@@ -141,19 +142,26 @@
       transition: transform .12s, box-shadow .15s;
     }
     .btn-add:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(124,58,237,.4); }
-    .actions { display: flex; gap: 14px; justify-content: center; margin-top: 34px; flex-wrap: wrap; }
-    .btn-primary, .btn-info, .btn-pdf {
+    .actions { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 34px; }
+    .action-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .btn-primary, .btn-info, .btn-newform, .btn-report {
       border: none; border-radius: 26px; padding: 13px 28px; font-family: inherit; font-size: 16px;
       font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
-      transition: transform .12s, box-shadow .15s;
+      transition: transform .12s, box-shadow .15s, filter .15s;
     }
+    /* โทนเย็นชุดเดียวกัน: ม่วง → คราม → ฟ้าคราม → น้ำเงิน */
     .btn-primary { background: linear-gradient(135deg,var(--purple),var(--purple-dark)); color:#fff; box-shadow:0 6px 18px rgba(124,58,237,.35); }
-    .btn-primary:hover { transform: translateY(-1px); }
-    .btn-primary:disabled { opacity:.6; cursor:not-allowed; transform:none; }
-    .btn-info { background: linear-gradient(135deg,#38bdf8,#0284c7); color:#fff; box-shadow:0 6px 18px rgba(2,132,199,.3); }
-    .btn-info:hover { transform: translateY(-1px); }
-    .btn-pdf { background: linear-gradient(135deg,#ef4444,#dc2626); color:#fff; box-shadow:0 6px 18px rgba(220,38,38,.3); }
-    .btn-pdf:hover { transform: translateY(-1px); }
+    .btn-newform { background: linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; box-shadow:0 6px 18px rgba(79,70,229,.3); }
+    .btn-info { background: linear-gradient(135deg,#06b6d4,#0891b2); color:#fff; box-shadow:0 6px 18px rgba(8,145,178,.3); }
+    .btn-report { background: linear-gradient(135deg,#3b82f6,#2563eb); color:#fff; box-shadow:0 6px 18px rgba(37,99,235,.3); }
+    /* ปุ่มที่กดไม่ได้ → สีจริงแต่จางมาก (สื่อว่าเป็นปุ่มอะไร แต่ยังกดไม่ได้) + คงเงาให้มีมิติ */
+    .btn-primary:disabled, .btn-newform:disabled, .split-btn3 button:disabled { cursor:not-allowed; transform:none; filter:none !important; }
+    .btn-primary:disabled { background:#ede9fe !important; color:#a78bfa !important; box-shadow:0 6px 18px rgba(0,0,0,.15) !important; }
+    .btn-newform:disabled { background:#eef2ff !important; color:#a5b4fc !important; box-shadow:0 6px 18px rgba(0,0,0,.15) !important; }
+    .split-btn3 .split-pdf:disabled { background:#ffe4e6 !important; color:#fb7185 !important; border-left-color:rgba(0,0,0,.04) !important; }
+    .split-btn3 .split-csv:disabled { background:#ccfbf1 !important; color:#2dd4bf !important; border-left-color:rgba(0,0,0,.04) !important; }
+    /* hover ทุกปุ่มหลัก — ยกขึ้นเล็กน้อย + สีสว่างขึ้น */
+    .btn-primary:hover:not(:disabled), .btn-info:hover:not(:disabled), .btn-report:hover:not(:disabled), .btn-newform:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.1); }
 
     .doc-footer { text-align: center; margin-top: 34px; color: #6b7280; font-size: 13px; line-height: 1.7; }
     .doc-footer .strong { color: #4b5563; font-weight: 500; }
@@ -187,6 +195,66 @@
     .alert-box .alert-msg b { color: #dc2626; }
     .alert-box .alert-btn { background: linear-gradient(135deg,#7c3aed,#6d28d9); color: #fff; border: none; border-radius: 24px; padding: 11px 34px; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
     .alert-box .alert-btn:hover { transform: translateY(-1px); }
+
+    /* ปุ่มหลายปุ่มในกล่อง popup สำเร็จ */
+    .popup-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+    .popup-actions button { width: 100%; border: none; border-radius: 24px; padding: 12px; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .popup-actions .pa-pdf { background: linear-gradient(135deg,#ef4444,#dc2626); color: #fff; }
+    .popup-actions .pa-new { background: linear-gradient(135deg,#7c3aed,#6d28d9); color: #fff; }
+    .popup-actions .pa-close { background: #f3f4f6; color: #4b5563; }
+    .popup-actions button:hover { filter: brightness(1.05); }
+
+    /* Modal ตรวจทานข้อมูลก่อนบันทึก */
+    .review-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,.6); display: none; align-items: flex-start; justify-content: center; z-index: 200; padding: 40px 16px; overflow-y: auto; }
+    .review-backdrop.show { display: flex; }
+    .review-box { background: #fff; border-radius: 18px; max-width: 920px; width: 100%; padding: 26px 28px; box-shadow: 0 18px 50px rgba(0,0,0,.3); animation: alertPop .25s cubic-bezier(.2,.9,.3,1.2); }
+    .review-box h2 { margin: 0 0 4px; font-family: 'Prompt','Sarabun',sans-serif; font-size: 20px; color: var(--purple-dark); }
+    .review-box .review-sub { color: var(--muted); font-size: 15.5px; margin-bottom: 18px; }
+    .review-info { background: #faf5ff; border: 1px solid #f0e7ff; border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; font-size: 17px; line-height: 2; }
+    .review-info b { color: var(--purple-dark); }
+    .review-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+    .review-table { width: 100%; border-collapse: collapse; font-size: 15.5px; min-width: 720px; }
+    .review-table th { background: var(--purple-table); color: #fff; padding: 11px 7px; white-space: nowrap; font-weight: 600; font-size: 15px; }
+    .review-table td { padding: 10px 7px; border-bottom: 1px solid var(--line); text-align: center; }
+    .review-table td.tl { text-align: left; }
+    .review-table td.long { color: #dc2626; font-weight: 700; }
+    .review-table tr:nth-child(even) td { background: #faf9fe; }
+    .review-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
+    .review-actions button { border: none; border-radius: 24px; padding: 12px 30px; font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+    .review-actions .rev-back { background: #f3f4f6; color: #4b5563; }
+    .review-actions .rev-confirm { background: linear-gradient(135deg,#10b981,#059669); color: #fff; }
+    .review-actions button:hover { filter: brightness(1.05); }
+
+    /* ปุ่มส่งออกแบ่ง 3 ส่วน ส่งออก | พิมพ์/PDF | CSV (ไม่ overflow:hidden เพื่อให้ tooltip โผล่ได้) */
+    .split-btn3 { display: flex; width: 100%; max-width: 460px; box-shadow: 0 6px 18px rgba(0,0,0,.15); border-radius: 26px; }
+    .split-btn3 > * { flex: 1 1 33.3333%; min-width: 0; box-sizing: border-box; padding: 13px 12px; font-family: inherit; font-size: 15px; font-weight: 600; color: #fff; text-align: center; border: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; transition: filter .12s; }
+    .split-btn3 > *:first-child { border-radius: 26px 0 0 26px; }
+    .split-btn3 > *:last-child { border-radius: 0 26px 26px 0; }
+    .split-btn3 .split-label { background: #64748b; cursor: default; }
+    .split-btn3 .split-pdf { background: linear-gradient(135deg,#f43f5e,#e11d48); cursor: pointer; border-left: 2px solid rgba(255,255,255,.45); }
+    .split-btn3 .split-csv { background: linear-gradient(135deg,#14b8a6,#0d9488); cursor: pointer; border-left: 2px solid rgba(255,255,255,.45); }
+    .split-btn3 button:hover:not(:disabled) { filter: brightness(1.08); }
+
+    /* Tooltip อธิบายปุ่ม (เอาเมาส์ชี้) */
+    [data-tip] { position: relative; }
+    [data-tip]:hover::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 9px); left: 50%; transform: translateX(-50%); background: #1f2937; color: #fff; padding: 8px 12px; border-radius: 9px; font-size: 12px; font-weight: 400; line-height: 1.4; white-space: normal; width: max-content; max-width: 230px; text-align: center; z-index: 80; pointer-events: none; box-shadow: 0 6px 18px rgba(0,0,0,.28); }
+    [data-tip]:hover::before { content: ''; position: absolute; bottom: calc(100% + 3px); left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-top-color: #1f2937; z-index: 80; pointer-events: none; }
+
+    /* ตัวหมุน "กำลังบันทึก" */
+    .spinner { width: 48px; height: 48px; border: 5px solid #e5e7eb; border-top-color: var(--purple); border-radius: 50%; margin: 0 auto 14px; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Popup คำชี้แจง (บังคับอ่านก่อนเข้าทุกครั้ง) */
+    .intro-gate { position: fixed; inset: 0; background: rgba(91,33,182,.22); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 20px; }
+    .intro-gate.hidden { display: none; }
+    body:has(#introGate:not(.hidden)) { overflow: hidden; } /* ล็อกเลื่อนตั้งแต่หน้าโหลด (เบราว์เซอร์ใหม่) */
+    .intro-box { background: #fff; border-radius: 20px; max-width: 440px; width: 100%; padding: 34px 30px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,.3); animation: alertPop .25s cubic-bezier(.2,.9,.3,1.2); }
+    .intro-box .intro-icon { font-size: 46px; margin-bottom: 8px; }
+    .intro-box h2 { margin: 0 0 8px; font-family: 'Prompt','Sarabun',sans-serif; font-size: 21px; color: var(--purple-dark); }
+    .intro-box p { font-size: 15px; color: var(--muted); line-height: 1.65; margin-bottom: 20px; }
+    .intro-box .intro-doc { display: block; background: linear-gradient(135deg,#38bdf8,#0284c7); color: #fff; text-decoration: none; border-radius: 24px; padding: 13px; font-weight: 600; font-size: 15px; margin-bottom: 12px; transition: filter .15s; }
+    .intro-box .intro-ok { width: 100%; background: linear-gradient(135deg,#10b981,#059669); color: #fff; border: none; border-radius: 24px; padding: 13px; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; transition: filter .15s; }
+    .intro-box .intro-doc:hover, .intro-box .intro-ok:hover { filter: brightness(1.08); }
 
     /* ===== PDF Modal ===== */
     .pdf-backdrop {
@@ -396,9 +464,19 @@
     <button type="button" class="btn-add" id="addRowBtn">+ เพิ่มแถว</button>
 
     <div class="actions">
-      <button type="submit" class="btn-primary" id="saveBtn">บันทึกข้อมูล</button>
-      <a class="btn-info" href="https://docs.google.com/document/d/1X8ED_ODmcdXqXxutB3j9gjTlZOvq_sQsnGzpGJQNfsY/edit?usp=sharing" target="_blank" rel="noopener">📋 คำชี้แจง</a>
-      <button type="button" class="btn-pdf" id="exportPdfBtn">🖨 ส่งออกเป็น PDF (A4)</button>
+      <div class="action-row">
+        <button type="submit" class="btn-primary" id="saveBtn" data-tip="ตรวจทานข้อมูลก่อน แล้วบันทึกลงระบบ">บันทึกข้อมูล</button>
+        <button type="button" class="btn-newform" id="newFormBtn" data-tip="ล้างฟอร์มเริ่มกรอกใบใหม่ (ต้องบันทึกใบนี้ก่อน)">＋ กรอกใบใหม่</button>
+        <a class="btn-info" href="https://docs.google.com/document/d/1X8ED_ODmcdXqXxutB3j9gjTlZOvq_sQsnGzpGJQNfsY/edit?usp=sharing" target="_blank" rel="noopener" data-tip="เปิดอ่านวิธีกรอกแบบฟอร์ม (Google Doc)">📋 คำชี้แจง</a>
+      </div>
+      <div class="action-row">
+        <div class="split-btn3" id="exportSplit">
+          <span class="split-label">ส่งออก</span>
+          <button type="button" class="split-pdf" id="exportPdfBtn" data-tip="เปิดเอกสารเพื่อพิมพ์ หรือเซฟเป็นไฟล์ PDF">🖨 พิมพ์/PDF</button>
+          <button type="button" class="split-csv" id="exportCsvBtn" data-tip="ดาวน์โหลดข้อมูลเป็นไฟล์ CSV เปิดใน Excel">📥 CSV</button>
+        </div>
+        <a class="btn-report" href="report.html" data-tip="ดูรายงานทั้งหมดที่บันทึกไว้ (ใช้รหัสผ่าน)">📊 ดูรายงานทั้งหมด</a>
+      </div>
     </div>
   </form>
 
@@ -409,7 +487,7 @@
   </div>
 </div>
 
-<a href="#" class="admin-link" id="adminLink">สำหรับ Admin</a>
+<a href="report.html" class="admin-link">📊 ดูรายงานทั้งหมด</a>
 
 <!-- PDF Modal -->
 <div class="pdf-backdrop" id="pdfModal">
@@ -431,8 +509,56 @@
   </div>
 </div>
 
+<!-- Modal ตรวจทานข้อมูลก่อนบันทึก -->
+<div class="review-backdrop" id="reviewModal">
+  <div class="review-box">
+    <h2>ตรวจทานข้อมูลก่อนบันทึก</h2>
+    <div class="review-sub">กรุณาตรวจสอบความถูกต้องอีกครั้ง ก่อนกดยืนยันบันทึก</div>
+    <div id="reviewContent"></div>
+    <div class="review-actions">
+      <button type="button" class="rev-back" id="reviewBackBtn">← กลับไปแก้</button>
+      <button type="button" class="rev-confirm" id="reviewConfirmBtn">ยืนยันบันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Popup บันทึก (2 สถานะ: กำลังบันทึก → สำเร็จ) -->
+<div class="alert-backdrop" id="successModal">
+  <div class="alert-box">
+    <div id="successLoading">
+      <div class="spinner"></div>
+      <div class="alert-title" style="color:#6d28d9;">กำลังบันทึก...</div>
+      <div class="alert-msg" style="text-align:center;">กรุณารอสักครู่</div>
+    </div>
+    <div id="successDone" style="display:none;">
+      <div class="alert-icon" style="background:#d1fae5;color:#059669;">✓</div>
+      <div class="alert-title" style="color:#047857;">บันทึกสำเร็จ</div>
+      <div class="alert-msg" style="text-align:center;">บันทึกข้อมูลลง Google Sheet เรียบร้อยแล้ว<br>ต้องการทำอะไรต่อคะ</div>
+      <div class="popup-actions">
+        <button type="button" class="pa-pdf" id="successPdfBtn">🖨 ส่งออกเป็น PDF (พิมพ์)</button>
+        <button type="button" class="pa-new" id="successNewBtn">＋ กรอกใบใหม่</button>
+        <button type="button" class="pa-close" id="successCloseBtn">ปิด (อยู่หน้านี้ต่อ)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Popup คำชี้แจง บังคับอ่านก่อนเข้า (แสดงทุกครั้งที่เปิดเว็บ) -->
+<div class="intro-gate" id="introGate">
+  <div class="intro-box">
+    <div class="intro-icon">📋</div>
+    <h2>คำชี้แจงการกรอกแบบฟอร์ม</h2>
+    <p>กรุณาอ่านคำชี้แจงให้เข้าใจก่อนเริ่มกรอกข้อมูล<br>เพื่อความถูกต้องของรายงาน</p>
+    <a class="intro-doc" href="https://docs.google.com/document/d/1X8ED_ODmcdXqXxutB3j9gjTlZOvq_sQsnGzpGJQNfsY/edit?usp=sharing" target="_blank" rel="noopener">📄 เปิดอ่านคำชี้แจง</a>
+    <button type="button" class="intro-ok" id="introOkBtn">อ่านแล้ว เริ่มกรอกข้อมูล</button>
+  </div>
+</div>
+
 <script>
   var THRESHOLD = 70;
+  // รหัสประจำการกรอกครั้งนี้ (สร้างใหม่ทุกครั้งที่เปิด/รีเฟรชหน้า)
+  // บันทึกซ้ำบนหน้าเดิม = รหัสเดิม → ระบบทับของเก่า | เปิดหน้าใหม่ = รหัสใหม่ → เพิ่มไม่ลบ
+  var SUBMISSION_ID = 'S' + Date.now() + '_' + Math.floor(Math.random()*1000000000);
   var PREFIX_OPTIONS = ['ด.ช.','ด.ญ.','นาย','น.ส.'];
   var REMARK_OPTIONS = ['-- เลือก --','ขาดเรียนนาน','อื่นๆ (กรอกเอง)'];
   var SEAT_OPTIONS = (function(){ var a=['–']; for(var n=1;n<=60;n++) a.push(String(n)); return a; })();
@@ -488,8 +614,9 @@
     var sepLbl = document.createElement('span'); sepLbl.className='sep'; sepLbl.textContent='/';
     var roomInp = document.createElement('input'); roomInp.type='text'; roomInp.maxLength=2; roomInp.dataset.field='room';
     roomInp.setAttribute('inputmode','numeric'); roomInp.placeholder='1';
-    onlyDigits(lvlInp); onlyDigits(roomInp);
-    lvlInp.addEventListener('input', function(){ if(this.value.length>=1) roomInp.focus(); });
+    onlyDigits(roomInp); // ห้องรับตัวเลขทั่วไป
+    // ระดับชั้นรับเฉพาะ 1-6 (ม.1-ม.6) แล้วเลื่อนไปช่องห้องอัตโนมัติ
+    lvlInp.addEventListener('input', function(){ this.value=this.value.replace(/[^1-6]/g,'').slice(0,1); if(this.value) roomInp.focus(); });
     cw.appendChild(pfxLbl); cw.appendChild(lvlInp); cw.appendChild(sepLbl); cw.appendChild(roomInp);
     tdCls.appendChild(cw); tr.appendChild(tdCls);
 
@@ -556,6 +683,12 @@
   document.getElementById('addRowBtn').addEventListener('click', addRow);
   addRow();
 
+  // ห้ามพิมพ์ช่องว่างในช่องเหล่านี้ (รหัสวิชา / ชื่อ-นามสกุลครู / หน่วยกิต)
+  ['subjectCode','teacherFirstName','teacherLastName','credits'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.addEventListener('input', function(){ this.value=this.value.replace(/\s+/g,''); });
+  });
+
   function buildCls(lv, rm) { return lv||rm ? 'ม.'+(lv||'')+(rm?'/'+rm:'') : ''; }
   function getRemark(tr) {
     var sel = tr.querySelector('[data-field=remarkSel]');
@@ -604,7 +737,22 @@
     if(!d.hoursPerWeek){errs.push('เวลาเรียนต่อสัปดาห์');mark('hoursPerWeek');}
     if(!d.semester){errs.push('ภาคเรียน');mark('semester');}
     if(!d.academicYear){errs.push('ปีการศึกษา');mark('academicYear');}
-    if(!d.students.filter(function(s){return s.name;}).length) errs.push('รายชื่อนักเรียนอย่างน้อย 1 คน');
+    // เช็คข้อมูลนักเรียนแต่ละแถว — บังคับ ชื่อ/ชั้น/ห้อง/คาบ/มาเรียน (ยกเว้น เลขที่ + หมายเหตุ)
+    var hasValid=false, rowIncomplete=false;
+    studentBody.querySelectorAll('tr').forEach(function(tr){
+      var g=function(f){ var e=tr.querySelector('[data-field="'+f+'"]'); return e?e.value.trim():''; };
+      var seat=g('seat'); if(seat==='–') seat='';
+      // แถวที่ว่างสนิท (ไม่กรอกอะไรเลย) → ข้าม ไม่บังคับ
+      if(!(g('name')||g('level')||g('room')||g('periods')||g('present')||seat)) return;
+      var miss=false;
+      ['name','level','room','periods','present'].forEach(function(f){
+        var e=tr.querySelector('[data-field="'+f+'"]');
+        if(e && !e.value.trim()){ e.classList.add('invalid'); miss=true; }
+      });
+      if(miss) rowIncomplete=true; else hasValid=true;
+    });
+    if(rowIncomplete) errs.push('ข้อมูลนักเรียนให้ครบ (ชื่อ ชั้น/ห้อง คาบ มาเรียน)');
+    else if(!hasValid) errs.push('รายชื่อนักเรียนอย่างน้อย 1 คน');
     return errs;
   }
 
@@ -628,18 +776,23 @@
 
   var saveBtn=document.getElementById('saveBtn');
   var exportPdfBtn=document.getElementById('exportPdfBtn');
+  var exportCsvBtn=document.getElementById('exportCsvBtn');
+  var newFormBtn=document.getElementById('newFormBtn');
   var dataSaved=false;
   function setSaved(v){
     dataSaved=v;
-    exportPdfBtn.disabled=!v;
-    exportPdfBtn.style.opacity=v?'':'0.5';
-    exportPdfBtn.style.cursor=v?'':'not-allowed';
+    // บันทึกแล้ว → ห้ามกดบันทึกซ้ำ (จนกว่าจะแก้ข้อมูล) + เปิดปุ่มส่งออก/กรอกใบใหม่
+    // สีปุ่ม (กดไม่ได้=ขาว / กดได้=เข้ม) จัดการใน CSS :disabled แล้ว
+    saveBtn.disabled=v;
+    [exportPdfBtn,exportCsvBtn,newFormBtn].forEach(function(b){ b.disabled=!v; });
   }
   function markUnsaved(){ if(dataSaved) setSaved(false); }
   setSaved(false);
+  // กรอกข้อมูลในช่องที่ขึ้นแดง (invalid) แล้ว → เอากรอบแดงออกทันที
+  function clearFieldInvalid(e){ var el=e.target; if(el.classList && el.classList.contains('invalid') && (el.value||'').trim()) el.classList.remove('invalid'); }
   // แก้ข้อมูลใดๆ (พิมพ์ / เลือก dropdown / เพิ่ม-ลบแถว) ต้องบันทึกใหม่ก่อนส่งออก PDF
-  document.getElementById('attendanceForm').addEventListener('input', markUnsaved);
-  document.getElementById('attendanceForm').addEventListener('change', markUnsaved);
+  document.getElementById('attendanceForm').addEventListener('input', function(e){ markUnsaved(); clearFieldInvalid(e); });
+  document.getElementById('attendanceForm').addEventListener('change', function(e){ markUnsaved(); clearFieldInvalid(e); });
   studentBody.addEventListener('click', function(e){ if(e.target.classList.contains('btn-del')) markUnsaved(); });
   document.getElementById('addRowBtn').addEventListener('click', markUnsaved);
 
@@ -656,7 +809,42 @@
         'แบบฟอร์มนี้สำหรับนักเรียนที่เข้าเรียน<b>ไม่ถึง '+THRESHOLD+'%</b> เท่านั้น<br><br>นักเรียนต่อไปนี้เข้าเรียนถึงเกณฑ์แล้ว กรุณาแก้ไขตัวเลข หรือลบรายชื่อออกก่อนบันทึก<br><br>'+list);
       return;
     }
-    saveBtn.disabled=true; saveBtn.textContent='กำลังบันทึก...';
+    showReview(d); // ยังไม่บันทึกจริง — แสดงหน้าตรวจทานก่อน
+  });
+
+  // ===== หน้าตรวจทานข้อมูลก่อนบันทึก =====
+  var pendingData=null;
+  var reviewModal=document.getElementById('reviewModal');
+  var successModal=document.getElementById('successModal');
+  function showReview(d){
+    pendingData=d;
+    var info='<div class="review-info">'+
+      'ครูผู้สอน: <b>'+esc((d.teacherPrefix||'')+d.teacherName)+'</b> &nbsp;|&nbsp; กลุ่มสาระ: <b>'+esc(d.subjectGroup)+'</b><br>'+
+      'รายวิชา: <b>'+esc(d.subjectName)+'</b> (รหัส <b>'+esc(d.subjectCode)+'</b>) &nbsp;|&nbsp; หน่วยกิต: <b>'+esc(d.credits)+'</b> &nbsp;|&nbsp; เวลาเรียน/สัปดาห์: <b>'+esc(d.hoursPerWeek)+'</b> ชม.<br>'+
+      'ภาคเรียน: <b>'+esc(d.semester)+'</b> &nbsp;|&nbsp; ปีการศึกษา: <b>'+esc(d.academicYear)+'</b> &nbsp;|&nbsp; จำนวนนักเรียน: <b>'+d.students.length+'</b> คน'+
+      '</div>';
+    var rows='';
+    d.students.forEach(function(s,i){
+      var longCls=(s.remark==='ขาดเรียนนาน')?' class="long"':'';
+      rows+='<tr><td>'+(i+1)+'</td><td>'+esc(s.seat)+'</td><td class="tl">'+esc((s.prefix||'')+s.name)+'</td><td>'+esc(s.classroom)+'</td><td>'+esc(s.periods)+'</td><td>'+esc(s.present)+'</td><td>'+esc(s.absent)+'</td><td>'+esc(s.percent)+'</td><td'+longCls+'>'+esc(s.remark)+'</td></tr>';
+    });
+    var table='<div class="review-table-wrap"><table class="review-table"><thead><tr><th>ลำดับ</th><th>เลขที่</th><th>ชื่อ-สกุล</th><th>ชั้น/ห้อง</th><th>คาบ</th><th>มา</th><th>ขาด</th><th>%</th><th>หมายเหตุ</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+    document.getElementById('reviewContent').innerHTML=info+table;
+    reviewModal.classList.add('show'); document.body.style.overflow='hidden';
+  }
+  function closeReview(){ reviewModal.classList.remove('show'); document.body.style.overflow=''; }
+  document.getElementById('reviewBackBtn').addEventListener('click', closeReview);
+  reviewModal.addEventListener('click', function(e){ if(e.target===reviewModal) closeReview(); });
+
+  // กดยืนยันในหน้าตรวจทาน → บันทึกจริง
+  document.getElementById('reviewConfirmBtn').addEventListener('click', function(){
+    var d=pendingData; if(!d) return;
+    d.submissionId=SUBMISSION_ID; // แนบรหัสประจำการกรอก ("ใบเดิม"=ทับ / "ใบใหม่"=เพิ่ม)
+    closeReview();
+    // เปลี่ยน popup ทันที → แสดงสถานะ "กำลังบันทึก" (ไม่มีช่วงว่างให้ผู้ใช้ไปกดอย่างอื่น)
+    document.getElementById('successLoading').style.display='';
+    document.getElementById('successDone').style.display='none';
+    successModal.classList.add('show'); document.body.style.overflow='hidden';
     var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
     fetch(SHEET_URL, {
       method: 'POST',
@@ -664,15 +852,40 @@
       headers: { 'Content-Type': 'text/plain' },
       body: JSON.stringify(d)
     }).then(function(){
-      saveBtn.disabled=false; saveBtn.textContent='บันทึกข้อมูล';
-      showToast('บันทึกลง Google Sheet เรียบร้อย กดส่งออก PDF ได้เลย','ok');
       setSaved(true);
+      // เปลี่ยน popup เป็นสถานะ "บันทึกสำเร็จ"
+      document.getElementById('successLoading').style.display='none';
+      document.getElementById('successDone').style.display='';
     }).catch(function(err){
-      saveBtn.disabled=false; saveBtn.textContent='บันทึกข้อมูล';
+      closeSuccess();
       showToast('บันทึกไม่สำเร็จ: '+err.message,'err');
     });
   });
+
+  // ===== Popup สำเร็จ =====
+  function closeSuccess(){ successModal.classList.remove('show'); document.body.style.overflow=''; }
+  document.getElementById('successCloseBtn').addEventListener('click', closeSuccess);
+  document.getElementById('successPdfBtn').addEventListener('click', function(){ closeSuccess(); exportPdfBtn.click(); });
+  document.getElementById('successNewBtn').addEventListener('click', function(){ closeSuccess(); doNewForm(); showToast('เริ่มกรอกใบใหม่ได้เลย','ok'); });
+
+  // ===== กรอกใบใหม่ =====
   function resetForm(){ document.getElementById('attendanceForm').reset(); studentBody.innerHTML=''; addRow(); }
+  function doNewForm(){
+    resetForm();
+    SUBMISSION_ID='S'+Date.now()+'_'+Math.floor(Math.random()*1000000000); // รหัสใหม่ = ใบใหม่ ไม่ทับของเก่า
+    setSaved(false);
+  }
+  document.getElementById('newFormBtn').addEventListener('click', function(){
+    doNewForm();
+    showToast('ล้างฟอร์มแล้ว เริ่มกรอกใบใหม่ได้เลย','ok');
+  });
+
+  // ปิด popup คำชี้แจง → เริ่มใช้งานเว็บ (แสดงทุกครั้งที่เปิดเว็บ)
+  document.getElementById('introOkBtn').addEventListener('click', function(){
+    document.getElementById('introGate').classList.add('hidden');
+    document.body.style.overflow=''; // ปลดล็อกการเลื่อนหน้า
+  });
+  document.body.style.overflow='hidden'; // ล็อกการเลื่อนขณะ popup คำชี้แจงแสดง
 
   /* ===== PDF ===== */
   var pdfModal=document.getElementById('pdfModal'), printArea=document.getElementById('printArea');
@@ -776,7 +989,26 @@
   document.getElementById('closePdfBtn').addEventListener('click', closePdf);
   pdfModal.addEventListener('click', function(e){ if(e.target===pdfModal) closePdf(); });
   document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
-  document.getElementById('adminLink').addEventListener('click', function(e){ e.preventDefault(); showToast('ส่วนผู้ดูแลระบบ — จะเพิ่มในขั้นต่อไป'); });
+
+  // ===== Export CSV (ข้อมูลที่กรอกในฟอร์มตอนนี้) =====
+  document.getElementById('exportCsvBtn').addEventListener('click', function(){
+    var d=collectData();
+    var rows=d.students.filter(function(s){return s.name;});
+    if(!rows.length){ showToast('ยังไม่มีรายชื่อนักเรียนให้ส่งออก','err'); return; }
+    var headers=['วันที่กรอก','คำนำหน้าครู','ชื่อครู','กลุ่มสาระ','รหัสวิชา','ชื่อรายวิชา','หน่วยกิต','ชั่วโมง/สัปดาห์','ภาคเรียน','ปีการศึกษา','ลำดับที่','เลขที่','คำนำหน้านักเรียน','ชื่อ-สกุล','ชั้น/ห้อง','คาบทั้งหมด','มาเรียน','ขาดเรียน','% การเข้าเรียน','หมายเหตุ'];
+    var q=function(v){ v=(v==null?'':String(v)); if(/[",\n]/.test(v)) v='"'+v.replace(/"/g,'""')+'"'; return v; };
+    var lines=[headers.map(q).join(',')];
+    rows.forEach(function(s,i){
+      lines.push([d.dateInput,d.teacherPrefix,d.teacherName,d.subjectGroup,d.subjectCode,d.subjectName,d.credits,d.hoursPerWeek,d.semester,d.academicYear,(i+1),s.seat,s.prefix,s.name,s.classroom,s.periods,s.present,s.absent,s.percent,s.remark].map(q).join(','));
+    });
+    var csv='﻿'+lines.join('\r\n'); // BOM กันภาษาไทยเพี้ยนใน Excel
+    var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    a.href=url; a.download='รายงานนักเรียน_'+(d.dateInput||'ฟอร์ม')+'.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    showToast('ส่งออก CSV เรียบร้อย','ok');
+  });
 </script>
 </body>
 </html>
