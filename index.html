@@ -32,7 +32,7 @@
       padding: 28px 18px 60px;
       font-size: 15px; line-height: 1.5;
     }
-    .page-wrap { max-width: 1320px; margin: 0 auto; }
+    .page-wrap { max-width: 1400px; margin: 0 auto; }
     .card {
       background: #fff; border-radius: 20px;
       box-shadow: 0 10px 40px rgba(91,33,182,.12);
@@ -90,16 +90,22 @@
 
     /* ===== Student table ===== */
     .section-title { font-size: 17px; font-weight: 600; margin: 26px 0 12px; }
-    .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--line); }
+    .table-wrap { overflow: visible; border-radius: 12px; border: 1px solid var(--line); }
     table { width: 100%; border-collapse: collapse; background: #fff; }
     #studentTable { min-width: 940px; }
     #studentTable thead th {
       background: var(--purple-table); color: #fff; font-weight: 600; font-size: 14px;
       padding: 10px 8px; text-align: center; border-right: 1px solid rgba(255,255,255,.2);
       vertical-align: middle; line-height: 1.4;
+      position: sticky; top: 0; z-index: 20;   /* หัวตารางตรึงเวลาเลื่อนดูรายชื่อยาวๆ */
     }
-    #studentTable thead th:last-child { border-right: none; }
+    #studentTable thead th:first-child { border-top-left-radius: 12px; }    /* มุมหัวตารางบนซ้ายมน */
+    #studentTable thead th:last-child { border-right: none; border-top-right-radius: 12px; }  /* มุมหัวตารางบนขวามน */
     #studentTable thead .sub { font-weight: 400; font-size: 12px; opacity: .85; display: block; margin-top: 2px; }
+    #studentTable thead th.fsort { cursor: pointer; user-select: none; }
+    #studentTable thead th.fsort:hover { background: #581c87; }
+    #studentTable thead th.fsort .fsarr { font-size: 14px; margin-left: 3px; opacity: .55; }
+    #studentTable thead th.fsort .fsarr.on { opacity: 1; font-size: 12px; }
     #studentTable tbody td {
       padding: 8px 7px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line);
       text-align: center; vertical-align: middle;
@@ -107,8 +113,8 @@
     #studentTable tbody td:last-child { border-right: none; }
     #studentTable tbody tr:nth-child(even) { background: #faf9fe; }
 
-    .col-no { width: 50px; } .col-seat { width: 70px; } .col-name { width: 320px; } .col-class { width: 86px; }
-    .col-num { width: 66px; } .col-percent { width: 96px; } .col-remark { width: 130px; min-width: 130px; }
+    .col-no { width: 50px; } .col-seat { width: 78px; } .col-name { width: 248px; } .col-class { width: 90px; }
+    .col-num { width: 84px; } .col-percent { width: 110px; } .col-remark { width: 130px; min-width: 130px; }
     .col-del { width: 62px; }
 
     .name-cell { display: flex; flex-direction: column; gap: 5px; }
@@ -119,8 +125,10 @@
     .class-cell-wrap .pfx { font-weight: 600; color: #4b5563; }
     .class-cell-wrap .sep { color: #6b7280; font-weight: 700; }
     .class-cell-wrap input { width: 34px; text-align: center; padding: 8px 4px; }
-    .num-cell input { width: 52px; text-align: center; font-size: 13px; padding-left: 4px; padding-right: 4px; }
-    .num-cell input::-webkit-inner-spin-button, .num-cell input::-webkit-outer-spin-button { margin-left: 0; }
+    .num-cell input { width: 100%; box-sizing: border-box; text-align: center; font-size: 13px; padding-left: 4px; padding-right: 4px; }
+    /* ซ่อนลูกศรเพิ่ม/ลดของช่องตัวเลข — กันเผลอกดเปลี่ยนค่า (พิมพ์เลขตรงๆแทน) */
+    .num-cell input::-webkit-inner-spin-button, .num-cell input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .num-cell input[type=number] { -moz-appearance: textfield; }
     .num-cell input.auto { background: #f3f4f6; font-weight: 600; color: #374151; }
     .percent-cell input { width: 64px; text-align: center; background: #ede9fe; font-weight: 700; color: #5b21b6; border-color: #c4b5fd; }
 
@@ -142,6 +150,13 @@
       transition: transform .12s, box-shadow .15s;
     }
     .btn-add:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(124,58,237,.4); }
+    .row-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .btn-fill { margin-top: 16px; background: linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; border:none; border-radius:22px; padding:11px 22px; font-family:inherit; font-size:15px; font-weight:500; cursor:pointer; box-shadow:0 4px 12px rgba(2,132,199,.3); transition:transform .12s, filter .15s; }
+    .btn-fill:hover { transform: translateY(-1px); filter: brightness(1.08); }
+    .btn-fill-cls { background: linear-gradient(135deg,#14b8a6,#0d9488); box-shadow:0 4px 12px rgba(13,148,136,.3); }
+    /* ชี้ปุ่มเติม → ไฮไลต์คอลัมน์ที่เกี่ยว (ฟ้าอ่อน) + เน้นค่าหลัก (แถวแรกที่กรอก) ตัวหนา+สีฟ้า */
+    #studentTable td.fill-hl { background:#e0f2fe !important; transition: background .15s; }
+    #studentTable td.fill-hl-key input { color:#0284c7 !important; font-weight:800 !important; }
     .actions { display: flex; flex-direction: column; gap: 14px; align-items: center; margin-top: 34px; }
     .action-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
     .btn-primary, .btn-info, .btn-newform, .btn-report {
@@ -207,6 +222,7 @@
     /* Modal ตรวจทานข้อมูลก่อนบันทึก */
     .review-backdrop { position: fixed; inset: 0; background: rgba(17,24,39,.6); display: none; align-items: flex-start; justify-content: center; z-index: 200; padding: 40px 16px; overflow-y: auto; }
     .review-backdrop.show { display: flex; }
+    #sortAskModal { align-items: center; padding: 16px; }   /* popup ถามเรียง → กลางเพจ (ต่างจากหน้าตรวจทานที่ชิดบน) */
     .review-box { background: #fff; border-radius: 18px; max-width: 920px; width: 100%; padding: 26px 28px; box-shadow: 0 18px 50px rgba(0,0,0,.3); animation: alertPop .25s cubic-bezier(.2,.9,.3,1.2); }
     .review-box h2 { margin: 0 0 4px; font-family: 'Prompt','Sarabun',sans-serif; font-size: 20px; color: var(--purple-dark); }
     .review-box .review-sub { color: var(--muted); font-size: 15.5px; margin-bottom: 18px; }
@@ -268,6 +284,8 @@
       box-shadow: 0 6px 18px rgba(0,0,0,.25); display: inline-flex; align-items: center; gap: 8px;
     }
     .float-print { left: 28px; background: linear-gradient(135deg,#10b981,#059669); color: #fff; }
+    .float-save { position: fixed; top: 22px; left: 150px; border: none; border-radius: 28px; padding: 12px 24px; font-family: 'Sarabun', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; z-index: 95; box-shadow: 0 6px 18px rgba(0,0,0,.25); display: inline-flex; align-items: center; gap: 8px; color: #fff; background: linear-gradient(135deg,#6366f1,#4f46e5); }
+    .float-save:hover { filter: brightness(1.08); }
     .float-close { right: 28px; background: linear-gradient(135deg,#f87171,#ef4444); color: #fff; }
     .print-hint {
       position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
@@ -325,7 +343,7 @@
       body { background: #fff !important; padding: 0 !important; }
       /* ซ่อนทุกอย่างยกเว้นเอกสาร — ใช้ display:none ให้เนื้อหาไหลข้ามหน้าได้ */
       .page-wrap, .admin-link, .toast { display: none !important; }
-      .float-print, .float-close, .print-hint { display: none !important; }
+      .float-print, .float-save, .float-close, .print-hint { display: none !important; }
       .pdf-backdrop {
         position: static !important; display: block !important; background: none !important;
         padding: 0 !important; overflow: visible !important;
@@ -349,6 +367,7 @@
       .doc-paper { padding: 10mm 8mm; }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.3/dist/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <div class="page-wrap">
@@ -447,21 +466,25 @@
         <thead>
           <tr>
             <th class="col-no">ลำดับที่</th>
-            <th class="col-name">ชื่อ – สกุล</th>
-            <th class="col-seat">เลขที่</th>
-            <th class="col-class">ชั้น / ห้อง</th>
-            <th class="col-num">คาบทั้งหมด</th>
-            <th class="col-num">มาเรียน</th>
-            <th class="col-num">ขาดเรียน<br /><span class="sub">(คิดให้)</span></th>
-            <th class="col-percent"><span style="white-space:nowrap">% การเข้าเรียน</span><br /><span class="sub">(คิดให้)</span></th>
-            <th class="col-remark">หมายเหตุ</th>
+            <th class="col-name fsort" data-sort="name" data-type="str" title="กดเพื่อเรียงลำดับ">ชื่อ – สกุล<span class="fsarr"></span></th>
+            <th class="col-seat fsort" data-sort="seat" data-type="num" title="กดเพื่อเรียงลำดับ">เลขที่<span class="fsarr"></span></th>
+            <th class="col-class fsort" data-sort="cls" data-type="str" title="กดเพื่อเรียงลำดับ">ชั้น / ห้อง<span class="fsarr"></span></th>
+            <th class="col-num fsort" data-sort="periods" data-type="num" title="กดเพื่อเรียงลำดับ">คาบทั้งหมด<span class="fsarr"></span></th>
+            <th class="col-num fsort" data-sort="present" data-type="num" title="กดเพื่อเรียงลำดับ">มาเรียน<span class="fsarr"></span></th>
+            <th class="col-num fsort" data-sort="absent" data-type="num" title="กดเพื่อเรียงลำดับ"><span style="white-space:nowrap">ขาดเรียน<span class="fsarr"></span></span><br /><span class="sub">(คิดให้)</span></th>
+            <th class="col-percent fsort" data-sort="percent" data-type="num" title="กดเพื่อเรียงลำดับ"><span style="white-space:nowrap">% การเข้าเรียน<span class="fsarr"></span></span><br /><span class="sub">(คิดให้)</span></th>
+            <th class="col-remark fsort" data-sort="remark" data-type="str" title="กดเพื่อเรียงลำดับ">หมายเหตุ<span class="fsarr"></span></th>
             <th class="col-del">ลบ</th>
           </tr>
         </thead>
         <tbody id="studentBody"></tbody>
       </table>
     </div>
-    <button type="button" class="btn-add" id="addRowBtn">+ เพิ่มแถว</button>
+    <div class="row-actions">
+      <button type="button" class="btn-add" id="addRowBtn">+ เพิ่มแถว</button>
+      <button type="button" class="btn-fill" id="fillPeriodsBtn" data-tip="คัดค่า 'คาบทั้งหมด' จากแถวแรกที่กรอก ไปเติมให้ทุกแถว (ชี้เพื่อดูว่าใช้ค่าจากช่องไหน)">📋 เติมจำนวนคาบทุกแถว</button>
+      <button type="button" class="btn-fill btn-fill-cls" id="fillClassBtn" data-tip="คัดค่า 'ชั้น/ห้อง' จากแถวแรกที่กรอก ไปเติมให้ทุกแถว">📋 เติมชั้น/ห้องทุกแถว</button>
+    </div>
 
     <div class="actions">
       <div class="action-row">
@@ -491,8 +514,9 @@
 
 <!-- PDF Modal -->
 <div class="pdf-backdrop" id="pdfModal">
-  <button type="button" class="float-print no-print" id="printBtn">🖨 พิมพ์ / บันทึก PDF</button>
-  <div class="print-hint no-print">ในหน้าต่างพิมพ์ เลือกกระดาษ A4 และเอาเครื่องหมายถูก "หัวกระดาษและท้ายกระดาษ" ออก</div>
+  <button type="button" class="float-print no-print" id="printBtn">🖨 พิมพ์</button>
+  <button type="button" class="float-save no-print" id="savePdfBtn">📥 บันทึก PDF</button>
+  <div class="print-hint no-print">"พิมพ์" = เปิดหน้าต่างพิมพ์ (เลือก A4 + เอาหัว/ท้ายกระดาษออก) · "บันทึก PDF" = ดาวน์โหลดไฟล์ทันที</div>
   <button type="button" class="float-close no-print" id="closePdfBtn">ปิด</button>
   <div class="doc-paper" id="printArea"></div>
 </div>
@@ -506,6 +530,30 @@
     <div class="alert-title" id="alertTitle">แจ้งเตือน</div>
     <div class="alert-msg" id="alertMsg"></div>
     <button type="button" class="alert-btn" id="alertBtn">รับทราบ</button>
+  </div>
+</div>
+
+<!-- Popup ถามก่อนบันทึก: เรียงตามเลขที่ไหม -->
+<div class="review-backdrop" id="sortAskModal">
+  <div class="review-box" style="max-width:460px">
+    <h2 style="text-align:center">เรียงตามเลขที่</h2>
+    <div class="review-sub" style="text-align:center">ต้องการจัดเรียงรายชื่อตาม "เลขที่" จากน้อยไปมากก่อนบันทึกไหม</div>
+    <div class="review-actions" style="justify-content:center">
+      <button type="button" class="rev-back" id="sortNoBtn">ไม่เรียง คงลำดับเดิม</button>
+      <button type="button" class="rev-confirm" id="sortYesBtn">เรียงตามเลขที่</button>
+    </div>
+  </div>
+</div>
+
+<!-- Popup ยืนยันลบนักเรียน -->
+<div class="review-backdrop" id="delConfirmModal" style="align-items:center;padding:16px">
+  <div class="review-box" style="max-width:420px">
+    <h2 style="text-align:center;color:#dc2626">ยืนยันการลบ</h2>
+    <div class="review-sub" style="text-align:center">ต้องการลบนักเรียนแถวนี้ออกจากตารางใช่ไหม</div>
+    <div class="review-actions" style="justify-content:center">
+      <button type="button" class="rev-back" id="delCancelBtn">ยกเลิก</button>
+      <button type="button" class="rev-confirm" id="delConfirmBtn" style="background:linear-gradient(135deg,#ef4444,#dc2626)">ลบแถวนี้</button>
+    </div>
   </div>
 </div>
 
@@ -528,7 +576,7 @@
     <div id="successLoading">
       <div class="spinner"></div>
       <div class="alert-title" style="color:#6d28d9;">กำลังบันทึก...</div>
-      <div class="alert-msg" style="text-align:center;">กรุณารอสักครู่</div>
+      <div class="alert-msg" style="text-align:center;">กรุณารอสักครู่ <b style="color:#dc2626;">อย่าปิดหรือออกจากหน้านี้</b> จนกว่าจะบันทึกเสร็จ</div>
       <div class="popup-actions"><button type="button" class="pa-close" id="savingCancelBtn">ยกเลิก</button></div>
     </div>
     <div id="successDone" style="display:none;">
@@ -670,7 +718,7 @@
     // ลบ
     var tdDel = document.createElement('td'); tdDel.className='col-del';
     var delBtn = document.createElement('button'); delBtn.type='button'; delBtn.className='btn-del'; delBtn.textContent='ลบ';
-    delBtn.addEventListener('click', function(){ tr.remove(); renumber(); });
+    delBtn.addEventListener('click', function(){ askDelete(tr); });
     tdDel.appendChild(delBtn); tr.appendChild(tdDel);
 
     studentBody.appendChild(tr);
@@ -683,6 +731,95 @@
 
   document.getElementById('addRowBtn').addEventListener('click', addRow);
   addRow();
+
+  // ===== ยืนยันก่อนลบนักเรียน =====
+  var pendingDelTr=null;
+  function askDelete(tr){ pendingDelTr=tr; document.getElementById('delConfirmModal').classList.add('show'); }
+  document.getElementById('delCancelBtn').addEventListener('click', function(){ document.getElementById('delConfirmModal').classList.remove('show'); pendingDelTr=null; });
+  document.getElementById('delConfirmBtn').addEventListener('click', function(){
+    document.getElementById('delConfirmModal').classList.remove('show');
+    if(pendingDelTr){ pendingDelTr.remove(); renumber(); pendingDelTr=null; }
+  });
+
+  // ===== กันออกจากหน้า/รีเฟรช ทั้งที่ยังไม่บันทึก =====
+  var formDirty=false;
+  document.getElementById('attendanceForm').addEventListener('input', function(){ formDirty=true; });
+  window.addEventListener('beforeunload', function(e){ if(formDirty){ e.preventDefault(); e.returnValue=''; } });
+
+  // ===== เรียงลำดับตามหัวคอลัมน์ (ยกเว้น "ลำดับที่" ที่คงที่เป็นเลขตำแหน่งแถว) =====
+  var fSort={ key:null, dir:1 };
+  function sortGetVal(tr, field){
+    if(field==='name') return (tr.querySelector('[data-field=name]')||{}).value||'';
+    if(field==='seat') return (tr.querySelector('[data-field=seat]')||{}).value||'';
+    if(field==='cls'){ var l=(tr.querySelector('[data-field=level]')||{}).value||'', r=(tr.querySelector('[data-field=room]')||{}).value||''; return (l?('0'+l).slice(-2):'00')+'/'+(r?('00'+r).slice(-3):'000'); }
+    if(field==='periods') return (tr.querySelector('[data-field=periods]')||{}).value||'';
+    if(field==='present') return (tr.querySelector('[data-field=present]')||{}).value||'';
+    if(field==='absent') return (tr.querySelector('[data-field=absent]')||{}).value||'';
+    if(field==='percent') return (tr.querySelector('[data-field=percent]')||{}).value||'';
+    if(field==='remark') return getRemark(tr);
+    return '';
+  }
+  function sortRows(field, type){
+    if(fSort.key===field) fSort.dir=-fSort.dir; else { fSort.key=field; fSort.dir=1; }
+    var rows=Array.prototype.slice.call(studentBody.querySelectorAll('tr'));
+    rows.sort(function(a,b){
+      var va=sortGetVal(a,field), vb=sortGetVal(b,field);
+      if(type==='num'){ var na=parseFloat(va), nb=parseFloat(vb); na=isNaN(na)?-Infinity:na; nb=isNaN(nb)?-Infinity:nb; return (na-nb)*fSort.dir; }
+      return String(va).localeCompare(String(vb),'th',{numeric:true})*fSort.dir;
+    });
+    rows.forEach(function(tr){ studentBody.appendChild(tr); }); // จัดเรียงใหม่ใน DOM
+    renumber(); // ลำดับที่ = เลขตำแหน่งแถว 1,2,3 ใหม่เสมอ
+    updateFsortArrows();
+  }
+  function updateFsortArrows(){
+    document.querySelectorAll('#studentTable th.fsort').forEach(function(th){
+      var a=th.querySelector('.fsarr'); if(!a) return;
+      var on=(th.getAttribute('data-sort')===fSort.key);
+      a.textContent=on?(fSort.dir>0?'▲':'▼'):'⇅';
+      a.className='fsarr'+(on?' on':'');
+    });
+  }
+  document.querySelectorAll('#studentTable th.fsort').forEach(function(th){
+    th.addEventListener('click', function(){ sortRows(th.getAttribute('data-sort'), th.getAttribute('data-type')); });
+  });
+  updateFsortArrows(); // แสดง ⇅ บอกว่าเรียงได้
+
+  // ===== เติมค่าให้ทุกแถวทีเดียว (ใช้ค่าจากแถวแรกที่กรอก) — คาบ + ชั้น/ห้อง =====
+  // ชี้ปุ่ม → ไฮไลต์คอลัมน์ที่เกี่ยว + เน้นค่าหลัก (แถวแรกที่กรอก)
+  function fillHover(kind, on){
+    var rows=studentBody.querySelectorAll('tr'), keyDone=false;
+    rows.forEach(function(tr){
+      var td, hasVal;
+      if(kind==='periods'){ var i=tr.querySelector('[data-field=periods]'); td=i?i.closest('td'):null; hasVal=i&&i.value!==''; }
+      else { td=tr.querySelector('.col-class'); var l=tr.querySelector('[data-field=level]'); hasVal=l&&l.value!==''; }
+      if(!td) return;
+      td.classList.toggle('fill-hl', on);
+      td.classList.remove('fill-hl-key');
+      if(on && !keyDone && hasVal){ td.classList.add('fill-hl-key'); keyDone=true; }
+    });
+  }
+  document.getElementById('fillPeriodsBtn').addEventListener('mouseenter', function(){ fillHover('periods',true); });
+  document.getElementById('fillPeriodsBtn').addEventListener('mouseleave', function(){ fillHover('periods',false); });
+  document.getElementById('fillClassBtn').addEventListener('mouseenter', function(){ fillHover('class',true); });
+  document.getElementById('fillClassBtn').addEventListener('mouseleave', function(){ fillHover('class',false); });
+  document.getElementById('fillPeriodsBtn').addEventListener('click', function(){
+    var rows=studentBody.querySelectorAll('tr');
+    if(!rows.length) return;
+    var val='';
+    for(var i=0;i<rows.length;i++){ var v=(rows[i].querySelector('[data-field=periods]')||{}).value; if(v!=null && v!==''){ val=v; break; } }
+    if(val===''){ showToast('กรอกคาบทั้งหมดในแถวแรกก่อน แล้วกดปุ่มนี้อีกครั้ง','error'); var f=rows[0].querySelector('[data-field=periods]'); if(f) f.focus(); return; }
+    rows.forEach(function(tr){ var p=tr.querySelector('[data-field=periods]'); if(p){ p.value=val; p.dispatchEvent(new Event('input')); } });
+    showToast('เติมคาบทั้งหมด '+val+' คาบ ให้ครบทุกแถวแล้ว','success');
+  });
+  document.getElementById('fillClassBtn').addEventListener('click', function(){
+    var rows=studentBody.querySelectorAll('tr');
+    if(!rows.length) return;
+    var lv='', rm='';
+    for(var i=0;i<rows.length;i++){ var l=(rows[i].querySelector('[data-field=level]')||{}).value||'', r=(rows[i].querySelector('[data-field=room]')||{}).value||''; if(l||r){ lv=l; rm=r; break; } }
+    if(!lv && !rm){ showToast('กรอกชั้น/ห้องในแถวแรกก่อน แล้วกดปุ่มนี้อีกครั้ง','error'); var f=rows[0].querySelector('[data-field=level]'); if(f) f.focus(); return; }
+    rows.forEach(function(tr){ var l=tr.querySelector('[data-field=level]'), r=tr.querySelector('[data-field=room]'); if(l) l.value=lv; if(r) r.value=rm; });
+    showToast('เติมชั้น/ห้อง ม.'+lv+(rm?'/'+rm:'')+' ให้ครบทุกแถวแล้ว','success');
+  });
 
   // ห้ามพิมพ์ช่องว่างในช่องเหล่านี้ (รหัสวิชา / ชื่อ-นามสกุลครู / หน่วยกิต)
   ['subjectCode','teacherFirstName','teacherLastName','credits'].forEach(function(id){
@@ -726,6 +863,20 @@
   }
 
   function clearInvalid(){ document.querySelectorAll('.invalid').forEach(function(e){e.classList.remove('invalid');}); }
+  // ตรวจเลขที่ซ้ำในห้องเดียวกัน (ชั้น+ห้อง+เลขที่ ตรงกัน) → ไฮไลต์แดงทั้งคู่ทันที · คืน true ถ้าพบซ้ำ
+  function markSeatDups(){
+    var seats=studentBody.querySelectorAll('[data-field=seat]'), seen={}, dup=false;
+    seats.forEach(function(se){ se.classList.remove('invalid'); se.removeAttribute('title'); });
+    seats.forEach(function(se){
+      var v=(se.value||'').trim(); if(v===''||v==='–') return;
+      var tr=se.closest('tr');
+      var lv=tr.querySelector('[data-field=level]'), rm=tr.querySelector('[data-field=room]');
+      var key=(lv?lv.value.trim():'')+'/'+(rm?rm.value.trim():'')+'#'+v;
+      if(seen[key]){ dup=true; [se,seen[key]].forEach(function(x){ x.classList.add('invalid'); x.title='เลขที่ซ้ำกับแถวอื่นในห้องเดียวกัน'; }); }
+      else seen[key]=se;
+    });
+    return dup;
+  }
   function validate(d) {
     clearInvalid(); var errs=[], mark=function(id){var e=document.getElementById(id);if(e)e.classList.add('invalid');};
     if(!d.dateInput){errs.push('วันที่');mark('dateInput');}
@@ -762,6 +913,8 @@
     if(rowIncomplete) errs.push('ข้อมูลนักเรียนให้ครบ (ชื่อ ชั้น/ห้อง คาบ มาเรียน)');
     else if(!hasValid) errs.push('รายชื่อนักเรียนอย่างน้อย 1 คน');
     if(presentOver) errs.push('มาเรียนมากกว่าคาบทั้งหมด (ตรวจสอบตัวเลข)');
+    // เช็คเลขที่ซ้ำในห้องเดียวกัน (กันเผลอกรอกเลขที่ชนกัน) — ใช้ตรรกะเดียวกับการเตือนสด
+    if(markSeatDups()) errs.push('เลขที่ซ้ำกันในห้องเดียวกัน (ตรวจสอบเลขที่)');
     return errs;
   }
 
@@ -800,8 +953,8 @@
   // กรอกข้อมูลในช่องที่ขึ้นแดง (invalid) แล้ว → เอากรอบแดงออกทันที
   function clearFieldInvalid(e){ var el=e.target; if(el.classList && el.classList.contains('invalid') && (el.value||'').trim()) el.classList.remove('invalid'); }
   // แก้ข้อมูลใดๆ (พิมพ์ / เลือก dropdown / เพิ่ม-ลบแถว) ต้องบันทึกใหม่ก่อนส่งออก PDF
-  document.getElementById('attendanceForm').addEventListener('input', function(e){ markUnsaved(); clearFieldInvalid(e); });
-  document.getElementById('attendanceForm').addEventListener('change', function(e){ markUnsaved(); clearFieldInvalid(e); });
+  document.getElementById('attendanceForm').addEventListener('input', function(e){ markUnsaved(); clearFieldInvalid(e); markSeatDups(); });
+  document.getElementById('attendanceForm').addEventListener('change', function(e){ markUnsaved(); clearFieldInvalid(e); markSeatDups(); });
   studentBody.addEventListener('click', function(e){ if(e.target.classList.contains('btn-del')) markUnsaved(); });
   document.getElementById('addRowBtn').addEventListener('click', markUnsaved);
 
@@ -818,7 +971,23 @@
         'แบบฟอร์มนี้สำหรับนักเรียนที่เข้าเรียน<b>ไม่ถึง '+THRESHOLD+'%</b> เท่านั้น<br><br>นักเรียนต่อไปนี้เข้าเรียนถึงเกณฑ์แล้ว กรุณาแก้ไขตัวเลข หรือลบรายชื่อออกก่อนบันทึก<br><br>'+list);
       return;
     }
-    showReview(d); // ยังไม่บันทึกจริง — แสดงหน้าตรวจทานก่อน
+    // ถามก่อนว่าจะเรียงตามเลขที่ไหม → แล้วค่อยไปหน้าตรวจทาน
+    askSortBeforeSave(function(){
+      var d2=collectData(); d2.students=d2.students.filter(function(s){return s.name;});
+      showReview(d2); // ยังไม่บันทึกจริง — แสดงหน้าตรวจทานก่อน
+    });
+  });
+  // popup ถามเรียงเลขที่ก่อนบันทึก
+  var sortAskCb=null;
+  function askSortBeforeSave(cb){ sortAskCb=cb; document.getElementById('sortAskModal').classList.add('show'); }
+  document.getElementById('sortYesBtn').addEventListener('click', function(){
+    document.getElementById('sortAskModal').classList.remove('show');
+    fSort={ key:null, dir:1 }; sortRows('seat','num'); // เรียงเลขที่ น้อย→มาก
+    if(sortAskCb){ sortAskCb(true); sortAskCb=null; }
+  });
+  document.getElementById('sortNoBtn').addEventListener('click', function(){
+    document.getElementById('sortAskModal').classList.remove('show');
+    if(sortAskCb){ sortAskCb(false); sortAskCb=null; }
   });
 
   // ===== หน้าตรวจทานข้อมูลก่อนบันทึก =====
@@ -889,6 +1058,7 @@
   document.getElementById('reviewConfirmBtn').addEventListener('click', function(){
     var d=pendingData; if(!d) return;
     d.submissionId=SUBMISSION_ID; // แนบรหัสประจำการกรอก ("ใบเดิม"=ทับ / "ใบใหม่"=เพิ่ม)
+    formDirty=false; // กดยืนยันบันทึกแล้ว — ไม่ต้องเตือนตอนออกจากหน้า
     closeReview();
     saveCancelled=false;
     // เปลี่ยน popup ทันที → แสดงสถานะ "กำลังบันทึก" (ไม่มีช่วงว่างให้ผู้ใช้ไปกดอย่างอื่น)
@@ -920,7 +1090,7 @@
   document.getElementById('successNewBtn').addEventListener('click', function(){ closeSuccess(); doNewForm(); showToast('เริ่มกรอกใบใหม่ได้เลย','ok'); });
 
   // ===== กรอกใบใหม่ =====
-  function resetForm(){ document.getElementById('attendanceForm').reset(); studentBody.innerHTML=''; addRow(); }
+  function resetForm(){ document.getElementById('attendanceForm').reset(); studentBody.innerHTML=''; addRow(); formDirty=false; }
   function doNewForm(){
     resetForm();
     SUBMISSION_ID='S'+Date.now()+'_'+Math.floor(Math.random()*1000000000); // รหัสใหม่ = ใบใหม่ ไม่ทับของเก่า
@@ -1041,6 +1211,14 @@
   document.getElementById('closePdfBtn').addEventListener('click', closePdf);
   // หน้า PDF ปิดได้เฉพาะปุ่ม "ปิด" เท่านั้น — กดพื้นที่ว่างรอบๆ ไม่ปิด (กันปิดพลาดตอนกำลังดู/พิมพ์)
   document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
+  // บันทึก PDF ตรงๆ ด้วย html2pdf (ถ้า lib โหลดไม่ได้ → fallback หน้าต่างพิมพ์)
+  document.getElementById('savePdfBtn').addEventListener('click', function(){
+    var el=document.getElementById('printArea');
+    if(typeof html2pdf==='undefined'){ window.print(); return; }
+    var btn=this, old=btn.textContent; btn.disabled=true; btn.textContent='⏳ กำลังบันทึก...';
+    var done=function(){ btn.disabled=false; btn.textContent=old; };
+    html2pdf().set({ margin:0, filename:'รายงานนักเรียน_'+new Date().toISOString().slice(0,10)+'.pdf', image:{type:'jpeg',quality:0.98}, html2canvas:{scale:3, useCORS:true, letterRendering:true, backgroundColor:'#ffffff'}, jsPDF:{unit:'mm', format:'a4', orientation:'portrait'} }).from(el).save().then(done).catch(done);
+  });
 
   // ===== Export CSV (ข้อมูลที่กรอกในฟอร์มตอนนี้) =====
   document.getElementById('exportCsvBtn').addEventListener('click', function(){

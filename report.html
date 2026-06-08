@@ -56,13 +56,19 @@
     /* Modal รายการใบรายงาน */
     .rm-backdrop{ position:fixed; inset:0; background:rgba(17,24,39,.55); display:none; align-items:center; justify-content:center; z-index:250; padding:20px; }
     .rm-backdrop.show{ display:flex; }
-    .rm-box{ background:#fff; border-radius:18px; max-width:1100px; width:96vw; max-height:88vh; display:flex; flex-direction:column; padding:24px; box-shadow:0 18px 50px rgba(0,0,0,.3); }
+    .rm-box{ background:#fff; border-radius:18px; max-width:1100px; width:96vw; height:88vh; max-height:88vh; display:flex; flex-direction:column; padding:24px; box-shadow:0 18px 50px rgba(0,0,0,.3); position:relative; }
+    /* ปุ่มกดขึ้นบนสุดในป๊อปอัป — มุมขวาล่าง โปร่งแสง โผล่เฉพาะเมื่อเลื่อนลง ไม่บังเนื้อหา */
+    .card-top-btn{ position:absolute; right:20px; bottom:78px; width:42px; height:42px; border-radius:50%; background:rgba(124,58,237,.85); color:#fff; border:none; font-size:22px; line-height:1; cursor:pointer; display:none; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(76,29,149,.35); z-index:15; transition:background .15s, transform .12s; }
+    .card-top-btn.show{ display:flex; }
+    .card-top-btn:hover{ background:var(--purple); transform:translateY(-2px); }
     /* การ์ดรายชื่อนักเรียน — ขยายใหญ่เท่าหน้าเว็บพื้นหลัง (1400px) เพราะข้อมูล/ตัวกรองเยอะ */
-    .rm-box.rm-wide{ max-width:1400px; width:96vw; max-height:92vh; }
+    .rm-box.rm-wide{ max-width:1400px; width:96vw; height:92vh; max-height:92vh; }   /* สูงคงที่เต็มจอ ไม่ขยาย-หดตามจำนวนข้อมูล + ปรับตามจอ (vh) รองรับทุกความละเอียด */
     .rm-box h3{ margin:0 0 14px; font-family:'Prompt','Sarabun',sans-serif; font-size:18px; color:var(--purple-dark); text-align:center; }
     .rm-scroll{ overflow:auto; flex:1; border:1px solid var(--line); border-radius:10px; scrollbar-gutter:stable; overscroll-behavior:contain; }
     .rm-table{ width:100%; border-collapse:collapse; font-size:14px; }
-    .rm-table th{ background:var(--purple-table); color:#fff; padding:10px 8px; position:sticky; top:0; white-space:nowrap; font-weight:600; text-align:left; }
+    .rm-table th{ background:var(--purple-table); color:#fff; padding:10px 8px; position:sticky; top:0; z-index:5; white-space:nowrap; font-weight:600; text-align:left; background-clip:padding-box; }
+    .rm-table thead th:first-child{ border-top-left-radius:10px; }
+    .rm-table thead th:last-child{ border-top-right-radius:10px; }
     .rm-table td{ padding:9px 8px; border-bottom:1px solid var(--line); }
     .rm-table tr:nth-child(even) td{ background:#faf9fe; }
     /* ตารางแบบกดขยาย (การ์ดรายชื่อนักเรียน) — 1 แถวต่อคน กดเปิดดูรายวิชา/ครู */
@@ -124,8 +130,11 @@
     .rm-exp th.rsortable .rarr.on{ opacity:1; font-size:13px; }                    /* ▲▼ เข้ม = กำลังเรียงคอลัมน์นี้ */
     .rm-exp th.rsortable:hover::after{ content:'กดเพื่อเรียงลำดับ'; position:absolute; left:50%; top:100%; transform:translateX(-50%); margin-top:4px; background:#4c1d95; color:#fff; font-size:11px; font-weight:500; padding:4px 9px; border-radius:6px; white-space:nowrap; z-index:9; pointer-events:none; box-shadow:0 6px 16px rgba(76,29,149,.3); }
     /* แถบตัวกรองในป๊อปอัปรายชื่อนักเรียน (เสมือนหน้าเพจย่อย) */
-    .stu-filter{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; padding-bottom:14px; border-bottom:1px solid #f0e9ff; }
+    .stu-filter{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; padding:6px 0 14px; border-bottom:1px solid #f0e9ff; position:sticky; top:0; z-index:8; background:#fff; }
     .stu-filter .fld{ display:flex; flex-direction:column; gap:4px; }
+    .stu-filter .stu-clear{ align-self:flex-end; background:#f5f3ff; color:#6d28d9; border:1.5px solid var(--purple); border-radius:9px; padding:8px 14px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .stu-filter .stu-clear:hover{ background:var(--purple); color:#fff; }
+    .rm-table.rm-exp thead th{ top:var(--popfh,0); }   /* หัวตารางตรึงใต้แถบกรอง (sticky) ในป๊อปอัป */
     .stu-filter .fld.grow{ flex:1; min-width:180px; }
     .stu-filter label{ font-size:12px; color:var(--muted); }
     .stu-filter input,.stu-filter select{ border:1px solid #d1d5db; border-radius:9px; padding:8px 11px; font-family:inherit; font-size:13px; background:#fff; outline:none; }
@@ -146,13 +155,26 @@
     /* แถวล่าง (กลุ่มเสี่ยง/รายวิชา) ข้อมูลเปลี่ยนตามกรอง/ค้นหา — ล็อกสูงคงที่ กันหด/ขยายเด้งกระตุก */
     #riskList,#subjectChart{ min-height:252px; display:flex; flex-direction:column; }
     .panel h3{ margin:0 0 14px; font-size:15px; color:var(--purple-dark); font-family:'Prompt','Sarabun',sans-serif; }
-    .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:9px; font-size:14px; }
+    .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:9px; font-size:14px; position:relative; }
+    /* ชี้แท่งกราฟ → ป้ายเล็กบอกค่า + เด้งนุ่ม + แท่งสว่างขึ้น */
+    /* ชี้แท่งกราฟ → แท่งบวมขึ้นนิดๆ + สว่างขึ้น (animation) */
+    .bar-row[data-tip]{ cursor:default; }
+    .bar-row[data-tip] .track{ transition:transform .15s cubic-bezier(.2,.9,.3,1.3); }
+    .bar-row[data-tip] .fill{ transition:width .4s, filter .15s; }
+    .bar-row[data-tip]:hover .track{ transform:scaleY(1.22); }
+    .bar-row[data-tip]:hover .fill{ filter:brightness(1.13) saturate(1.12); }
+    .bar-row[data-tip]:hover .num{ color:var(--purple-dark); font-weight:800; }
+    /* ป้ายลอยตามเมาส์ (ไม่ใช่กลางแถว) สีม่วง ไม่ใช่ดำ */
+    .chart-tip{ position:fixed; transform:translate(-50%,-130%); background:linear-gradient(135deg,#6d28d9,#7c3aed); color:#fff; font-size:12px; font-weight:600; padding:6px 12px; border-radius:9px; white-space:nowrap; z-index:60; pointer-events:none; box-shadow:0 8px 20px rgba(76,29,149,.4); opacity:0; transition:opacity .14s; }
+    .chart-tip.show{ opacity:1; }
+    .chart-tip::after{ content:''; position:absolute; left:50%; top:100%; transform:translateX(-50%); border:6px solid transparent; border-top-color:#7c3aed; }
     .bar-row .lbl{ width:42px; color:var(--muted); flex-shrink:0; }
     .bar-row .subj-lbl{ width:200px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.5; padding-block:1px; }   /* fix กว้างคงที่ → ทุกแท่งเริ่มตรงกัน เทียบง่าย (ชื่อยาวตัด ... ชี้เมาส์ดูเต็ม) */
     .bar-row .track{ flex:1; background:#f3f4f6; border-radius:8px; height:20px; overflow:hidden; }
-    .bar-row .fill{ height:100%; background:linear-gradient(90deg,#a78bfa,#7c3aed); border-radius:8px; transition:width .4s; }
+    .bar-row .fill{ height:100%; background:linear-gradient(90deg,#a78bfa,#7c3aed); border-radius:8px; transition:width .4s, filter .15s; }
     .bar-row .num{ width:36px; text-align:right; font-weight:600; flex-shrink:0; }
-    .risk-row{ display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:14px; line-height:1.6; }
+    .risk-row{ display:flex; align-items:center; justify-content:space-between; padding:8px 6px; border-bottom:1px solid var(--line); font-size:14px; line-height:1.6; border-radius:8px; transition:background .15s; }
+    .risk-row:hover{ background:#faf5ff; }
     .risk-row:last-child{ border-bottom:none; }
     .risk-row .pct{ font-weight:700; color:var(--red); }
     .empty-hint{ color:var(--muted); font-size:14px; text-align:center; padding:20px 0; }
@@ -177,8 +199,10 @@
     /* ไม่ใส่ overflow บน 2 ตัวนี้ — ให้หน้าเลื่อนทั้งหน้า (body) แล้วหัวตาราง sticky ติดใต้แถบกรองได้ */
     .table-card{ background:#fff; border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,.05); }
     .table-scroll{ overflow-x:visible; }
-    table.data{ width:100%; border-collapse:collapse; min-width:920px; }
+    table.data{ width:100%; border-collapse:collapse; min-width:1040px; }
     table.data thead th{ background:var(--purple-table); color:#fff; font-weight:600; font-size:13px; padding:12px 10px; text-align:left; white-space:nowrap; position:sticky; top:var(--fh,0); z-index:20; line-height:1.5; }
+    table.data thead th:first-child{ border-top-left-radius:12px; }
+    table.data thead th:last-child{ border-top-right-radius:12px; }
     table.data tbody td{ padding:10px; border-bottom:1px solid var(--line); font-size:14px; line-height:1.6; }
     table.data tbody tr.rpt-0 td{ background:#ffffff; }     /* ใบสลับสี: ขาว */
     table.data tbody tr.rpt-1 td{ background:#f5f3ff; }     /* ใบสลับสี: ม่วงจางมาก */
@@ -190,9 +214,12 @@
     table.data thead th .arr{ font-size:14px; margin-left:4px; opacity:.5; }     /* ⇅ = เรียงได้ */
     table.data thead th .arr.on{ opacity:1; font-size:12px; }                     /* ▲▼ = กำลังเรียง */
     table.data thead th.sortable:hover::after{ content:'กดเพื่อเรียงลำดับ'; position:absolute; left:50%; top:100%; transform:translateX(-50%); margin-top:4px; background:#4c1d95; color:#fff; font-size:11px; font-weight:500; padding:4px 9px; border-radius:6px; white-space:nowrap; z-index:9; pointer-events:none; box-shadow:0 6px 16px rgba(76,29,149,.3); }
-    .badge{ display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; }
+    .badge{ display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; white-space:nowrap; }
     .badge-saved{ background:#d1fae5; color:#047857; }
     .badge-long{ background:#fee2e2; color:#b91c1c; }
+    /* บีบคอลัมน์ตัวเลขให้แคบ (คาบ/มา/ขาด/%) → เหลือที่ให้คอลัมน์หมายเหตุ */
+    table.data th[data-key="periods"],table.data th[data-key="present"],table.data th[data-key="absent"]{ width:64px; }
+    table.data th[data-key="percent"],table.data th[data-key="seat"]{ width:72px; }
     .btn-pdf-row{ background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
     .btn-pdf-row:hover{ filter:brightness(1.08); }
 
@@ -217,6 +244,8 @@
     .pdf-backdrop.show{ display:flex; align-items:flex-start; }
     .float-print,.float-close{ position:fixed; top:22px; border:none; border-radius:28px; padding:12px 24px; font-family:'Sarabun',sans-serif; font-size:16px; font-weight:600; cursor:pointer; z-index:95; box-shadow:0 6px 18px rgba(0,0,0,.25); display:inline-flex; align-items:center; gap:8px; color:#fff; }
     .float-print{ left:28px; background:linear-gradient(135deg,#10b981,#059669); }
+    .float-save{ position:fixed; top:22px; left:150px; border:none; border-radius:28px; padding:12px 24px; font-family:'Sarabun',sans-serif; font-size:16px; font-weight:600; cursor:pointer; z-index:95; box-shadow:0 6px 18px rgba(0,0,0,.25); display:inline-flex; align-items:center; gap:8px; color:#fff; background:linear-gradient(135deg,#6366f1,#4f46e5); }
+    .float-save:hover{ filter:brightness(1.08); }
     .float-close{ right:28px; background:linear-gradient(135deg,#f87171,#ef4444); }
     .print-hint{ position:fixed; top:70px; left:50%; transform:translateX(-50%); background:rgba(17,24,39,.82); color:#fff; padding:6px 16px; border-radius:20px; font-size:13px; z-index:95; white-space:nowrap; }
     .doc-paper{ background:#fff; width:210mm; max-width:100%; min-height:287mm; padding:16mm 16mm; box-shadow:0 20px 60px rgba(0,0,0,.3); border-radius:2px; color:#000; font-family:'TH Sarabun New','TH SarabunPSK','Sarabun',serif; font-size:16pt; line-height:1.5; }
@@ -236,7 +265,7 @@
 
     @media print{
       body{ background:#fff !important; padding:0 !important; }
-      .wrap,.float-print,.float-close,.print-hint{ display:none !important; }
+      .wrap,.float-print,.float-save,.float-close,.print-hint,.rm-backdrop{ display:none !important; }
       .pdf-backdrop{ position:static !important; display:block !important; background:none !important; padding:0 !important; overflow:visible !important; }
       .doc-paper{ position:static !important; box-shadow:none !important; border-radius:0 !important; width:100% !important; max-width:none !important; min-height:0 !important; padding:0 !important; }
       .od-table{ page-break-inside:auto; }
@@ -245,6 +274,10 @@
       @page{ size:A4 portrait; margin:14mm; }
     }
   </style>
+  <!-- html2pdf — สำรองไว้ (เผื่อ fallback) -->
+  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.3/dist/html2pdf.bundle.min.js"></script>
+  <!-- pdfmake — สร้าง PDF เป็นตัวหนังสือจริง (ฟอนต์ไทยเป๊ะ ไม่เพี้ยน) โหลดฟอนต์ Sarabun เองตอนใช้งาน -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfmake@0.2.20/build/pdfmake.min.js"></script>
 </head>
 <body>
 
@@ -323,6 +356,7 @@
         <div><label>ถึงวันที่</label><input type="date" id="fTo"></div>
         <div><label>ระดับชั้น</label><select id="fGrade"></select></div>
         <div><label>ห้อง</label><select id="fRoom"></select></div>
+        <div><label>คำนำหน้า</label><select id="fPrefix"></select></div>
         <div><label>ครูผู้สอน</label><select id="fTeacher"></select></div>
         <div><label>รายวิชา</label><select id="fSubject"></select></div>
         <div><label>ภาคเรียน / ปีการศึกษา</label><select id="fTerm"></select></div>
@@ -340,11 +374,14 @@
               <th class="sortable" data-key="teacher">ครูผู้สอน<span class="arr"></span></th>
               <th class="sortable" data-key="subject">รายวิชา<span class="arr"></span></th>
               <th class="sortable" data-key="seat">เลขที่<span class="arr"></span></th>
+              <th class="sortable" data-key="prefix">คำนำหน้า<span class="arr"></span></th>
               <th class="sortable" data-key="name">ชื่อ – สกุล<span class="arr"></span></th>
               <th class="sortable" data-key="cls">ชั้น/ห้อง<span class="arr"></span></th>
+              <th class="sortable" data-key="periods">คาบทั้งหมด<span class="arr"></span></th>
+              <th class="sortable" data-key="present">มาเรียน<span class="arr"></span></th>
+              <th class="sortable" data-key="absent">ขาดเรียน<span class="arr"></span></th>
               <th class="sortable" data-key="percent">% เข้าเรียน<span class="arr"></span></th>
               <th class="sortable" data-key="remark">หมายเหตุ<span class="arr"></span></th>
-              <th class="sortable" data-key="status">สถานะ<span class="arr"></span></th>
               <th>เอกสาร</th>
             </tr>
           </thead>
@@ -357,8 +394,9 @@
 
 <!-- ===== PDF Modal ===== -->
 <div class="pdf-backdrop" id="pdfModal">
-  <button type="button" class="float-print" id="printBtn">🖨 พิมพ์ / บันทึก PDF</button>
-  <div class="print-hint">ในหน้าต่างพิมพ์ เลือกกระดาษ A4 และเอาเครื่องหมายถูก "หัวกระดาษและท้ายกระดาษ" ออก</div>
+  <button type="button" class="float-print" id="printBtn">🖨 พิมพ์</button>
+  <button type="button" class="float-save" id="savePdfBtn">📥 บันทึก PDF</button>
+  <div class="print-hint">"พิมพ์" = เปิดหน้าต่างพิมพ์ (เลือก A4 + เอาหัว/ท้ายกระดาษออก) · "บันทึก PDF" = ดาวน์โหลดไฟล์ทันที</div>
   <button type="button" class="float-close" id="closePdfBtn">ปิด</button>
   <div class="doc-paper" id="printArea"></div>
 </div>
@@ -368,6 +406,7 @@
   <div class="rm-box">
     <h3 id="cardModalTitle"></h3>
     <div class="rm-scroll"><div id="cardModalBody"></div></div>
+    <button type="button" class="card-top-btn" id="cardTopBtn" title="ขึ้นบนสุด" aria-label="ขึ้นบนสุด">↑</button>
     <div class="rm-foot">
       <button type="button" class="rm-csv" id="cardCsvBtn">📥 ดาวน์โหลด CSV</button>
       <button type="button" class="rm-close" id="cardCloseBtn">ปิด</button>
@@ -379,6 +418,7 @@
   // ====== ค่าคงที่ ======
   var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
   var THRESHOLD=70, MIN_DOC_ROWS=10;
+  var currentDocData=null;   // ข้อมูลเอกสารใบที่กำลังเปิดอยู่ (ใช้สร้าง PDF ด้วย pdfmake)
   var THAI_MONTHS=['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   var NAME_MAX_FS=18.6667, NAME_MIN_FS=8;
   // ชื่อหัวคอลัมในชีต (ต้องตรงกับ Code.gs)
@@ -453,14 +493,14 @@
     document.getElementById('dash').classList.remove('hidden');
     buildFilterOptions();
     document.getElementById('fSearch').addEventListener('input', render); // ช่องค้นหา = พิมพ์ทีละตัว
-    ['fRoom','fTeacher','fSubject','fTerm','fRemark','fFrom','fTo'].forEach(function(id){
+    ['fRoom','fPrefix','fTeacher','fSubject','fTerm','fRemark','fFrom','fTo'].forEach(function(id){
       document.getElementById(id).addEventListener('change', render); // เมนูเลือก/วันที่ = เลือกครั้งเดียว (กัน render ซ้ำ 2 รอบ)
     });
     // เลือกระดับชั้น → อัปเดตรายการห้องตามชั้นนั้น
     document.getElementById('fGrade').addEventListener('change', function(){ updateRoomOptions(); render(); });
     document.getElementById('clearBtn').addEventListener('click', function(){
       document.getElementById('fSearch').value='';
-      ['fGrade','fSubject','fTeacher','fTerm','fRemark','fFrom','fTo'].forEach(function(id){ document.getElementById(id).value=''; });
+      ['fGrade','fPrefix','fSubject','fTeacher','fTerm','fRemark','fFrom','fTo'].forEach(function(id){ document.getElementById(id).value=''; });
       updateRoomOptions(); // รีเซ็ตห้อง (ปิดไว้)
       render();
     });
@@ -480,12 +520,19 @@
     var teachers=uniq(allRows.map(function(r){ return ((r[COL.tPrefix]||'')+r[COL.tName]).replace(/\s+/g,' ').trim(); })).sort();
     var subjects=uniq(allRows.map(function(r){ return r[COL.subject]; })).sort();
     var terms=uniq(allRows.map(function(r){ return termKey(r); })).sort();
-    var remarks=uniq(allRows.map(function(r){ return r[COL.remark]; })).sort();
+    // หมายเหตุมี 2 กลุ่ม: "ขาดเรียนนาน" กับ "อื่นๆ" (ที่เหลือ — ว่าง/ระบุเหตุอื่น)
+    var hasLong=allRows.some(function(r){ return r[COL.remark]==='ขาดเรียนนาน'; });
+    var hasOther=allRows.some(function(r){ return r[COL.remark]!=='ขาดเรียนนาน'; });
+    var remarkOpts=[];
+    if(hasLong) remarkOpts.push({v:'ขาดเรียนนาน', t:'ขาดเรียนนาน'});
+    if(hasOther) remarkOpts.push({v:'__other__', t:'อื่นๆ'});
+    var prefixes=uniq(allRows.map(function(r){ return r[COL.sPrefix]; }).filter(Boolean)).sort();
     fill('fGrade','ทุกระดับชั้น', grades.map(function(g){ return {v:g, t:'ม.'+g}; }));
+    fill('fPrefix','ทุกคำนำหน้า', prefixes.map(function(p){ return {v:p, t:p}; }));
     fill('fTeacher','ครูทุกคน', teachers.map(function(t){ return {v:t, t:t}; }));
     fill('fSubject','ทุกรายวิชา', subjects.map(function(s){ return {v:s, t:s}; }));
     fill('fTerm','ทุกภาคเรียน', terms.map(function(t){ return {v:t, t:t}; }));
-    fill('fRemark','ทุกหมายเหตุ', remarks.map(function(r){ return {v:r, t:r}; }));
+    fill('fRemark','ทุกหมายเหตุ', remarkOpts);
     updateRoomOptions(); // ห้อง: ปิดไว้จนกว่าจะเลือกระดับชั้น
   }
 
@@ -511,6 +558,7 @@
     var q=document.getElementById('fSearch').value.trim().toLowerCase();
     var g=document.getElementById('fGrade').value;
     var rm=document.getElementById('fRoom').value;
+    var pf=document.getElementById('fPrefix').value;
     var tc=document.getElementById('fTeacher').value;
     var sub=document.getElementById('fSubject').value;
     var tm=document.getElementById('fTerm').value;
@@ -521,10 +569,11 @@
       var pc=parseClass(r[COL.cls]);
       if(g && pc.level!==g) return false;
       if(rm && pc.room!==rm) return false;
+      if(pf && (r[COL.sPrefix]||'')!==pf) return false;
       if(tc && ((r[COL.tPrefix]||'')+r[COL.tName]).replace(/\s+/g,' ').trim()!==tc) return false;
       if(sub && r[COL.subject]!==sub) return false;
       if(tm && termKey(r)!==tm) return false;
-      if(rk && r[COL.remark]!==rk) return false;
+      if(rk){ if(rk==='__other__'){ if(r[COL.remark]==='ขาดเรียนนาน') return false; } else if(r[COL.remark]!==rk) return false; }
       if(from||to){ var d=tsDate(r[COL.ts]); if(from && d<from) return false; if(to && d>to) return false; }
       if(q){
         var hay=[r[COL.sName],(r[COL.tPrefix]||'')+r[COL.tName],r[COL.subject],r[COL.code],r[COL.cls],r[COL.seat],r[COL.group]].join(' ').toLowerCase();
@@ -540,11 +589,14 @@
     teacher:{ get:function(r){return (r[COL.tPrefix]||'')+r[COL.tName];}, type:'str' },
     subject:{ get:function(r){return r[COL.subject];}, type:'str' },
     seat:{ get:function(r){return r[COL.seat];}, type:'num' },
-    name:{ get:function(r){return (r[COL.sPrefix]||'')+r[COL.sName];}, type:'str' },
+    prefix:{ get:function(r){return r[COL.sPrefix];}, type:'str' },
+    name:{ get:function(r){return r[COL.sName];}, type:'str', alpha:true },  // ชื่อล้วน + เรียงตามตัวอักษร (ไม่ใช่ค่าเลข)
     cls:{ get:function(r){return r[COL.cls];}, type:'str' },
+    periods:{ get:function(r){return r[COL.periods];}, type:'num' },
+    present:{ get:function(r){return r[COL.present];}, type:'num' },
+    absent:{ get:function(r){return r[COL.absent];}, type:'num' },
     percent:{ get:function(r){return r[COL.percent];}, type:'num' },
-    remark:{ get:function(r){return r[COL.remark];}, type:'str' },
-    status:{ get:function(){return 'บันทึกแล้ว';}, type:'str' }
+    remark:{ get:function(r){return r[COL.remark];}, type:'str' }
   };
   var sortState={ key:'date', dir:-1 }; // เริ่มเรียงวันที่ใหม่→เก่า (ครูส่งทุก ~5 สัปดาห์)
   function dnum(v){ if(!v) return 0; var t=new Date(String(v)).getTime(); return isNaN(t)?0:t; }
@@ -555,7 +607,7 @@
       var va=c.get(a), vb=c.get(b);
       if(c.type==='num'){ var na=num(va), nb=num(vb); na=(na==null?-Infinity:na); nb=(nb==null?-Infinity:nb); return (na-nb)*dir; }
       if(c.type==='date'){ return (dnum(va)-dnum(vb))*dir; }
-      return String(va==null?'':va).localeCompare(String(vb==null?'':vb),'th',{numeric:true})*dir;
+      return String(va==null?'':va).localeCompare(String(vb==null?'':vb),'th',{numeric:c.alpha?false:true})*dir;
     });
     return arr;
   }
@@ -583,6 +635,16 @@
     syncStickyHead();
   }
   window.addEventListener('resize', syncStickyHead);
+
+  // ป้ายลอยตามเมาส์สำหรับกราฟแท่ง (แม่นยำตามตำแหน่งเมาส์ ไม่ใช่กลางแถว)
+  (function(){
+    var tip=document.createElement('div'); tip.className='chart-tip'; document.body.appendChild(tip);
+    document.addEventListener('mousemove', function(e){
+      var br=(e.target && e.target.closest)?e.target.closest('.bar-row[data-tip]'):null;
+      if(br){ tip.textContent=br.getAttribute('data-tip'); tip.style.left=e.clientX+'px'; tip.style.top=e.clientY+'px'; if(!tip.classList.contains('show')) tip.classList.add('show'); }
+      else if(tip.classList.contains('show')){ tip.classList.remove('show'); }
+    });
+  })();
 
   function renderKPI(rows){
     var sKey=function(r){ return String(r[COL.sName]||'').replace(/\s+/g,' ').trim(); }; // ระบุตัวนักเรียนจากชื่อ-สกุลล้วน (ไม่เอาคำนำหน้ามาทำให้แยก) + ยุบช่องว่าง
@@ -632,7 +694,7 @@
     Object.keys(counts).sort(function(a,b){ if(a==='อื่นๆ')return 1; if(b==='อื่นๆ')return -1; return (+a)-(+b); }).forEach(function(k){
       var w=Math.round(counts[k]/max*100);
       var label=(k==='อื่นๆ')?'อื่นๆ':'ม.'+k;
-      html+='<div class="bar-row"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+counts[k]+'</div></div>';
+      html+='<div class="bar-row" data-tip="'+esc(label)+' : '+counts[k]+' คน"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+counts[k]+'</div></div>';
     });
     document.getElementById('gradeChart').innerHTML=html||'<div class="empty-hint">ไม่มีข้อมูล</div>';
   }
@@ -644,7 +706,7 @@
     var keys=Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; });
     var max=1; keys.forEach(function(k){ if(counts[k]>max) max=counts[k]; });
     var html='';
-    keys.slice(0,7).forEach(function(k){ var w=Math.round(counts[k]/max*100); html+='<div class="bar-row"><div class="lbl subj-lbl" title="'+esc(k)+'">'+esc(k)+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+counts[k]+'</div></div>'; });
+    keys.slice(0,7).forEach(function(k){ var w=Math.round(counts[k]/max*100); html+='<div class="bar-row" data-tip="'+esc(k)+' : '+counts[k]+' คน"><div class="lbl subj-lbl" title="'+esc(k)+'">'+esc(k)+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+counts[k]+'</div></div>'; });
     if(!keys.length) html='<div class="empty-hint">ไม่มีข้อมูล</div>';
     else if(keys.length>7) html+='<div class="chart-more" onclick="openCardModal(\'subjects\')">ดูทั้งหมด ('+keys.length+' วิชา) →</div>';
     document.getElementById('subjectChart').innerHTML=html;
@@ -656,16 +718,16 @@
       {label:'น้อยกว่า 10%', test:function(p){return p<10;}, color:'#dc2626'},
       {label:'10–30%', test:function(p){return p>=10&&p<30;}, color:'#f97316'},
       {label:'30–50%', test:function(p){return p>=30&&p<50;}, color:'#f59e0b'},
-      {label:'50–70%', test:function(p){return p>=50&&p<70;}, color:'#eab308'},
-      {label:'70% ขึ้นไป', test:function(p){return p>=70;}, color:'#9ca3af'}
+      {label:'50–70%', test:function(p){return p>=50&&p<70;}, color:'#eab308'}
     ];
+    /* ไม่มีช่วง "70% ขึ้นไป" — เพราะระบบกันบันทึกนักเรียนที่เข้าเรียนถึง/เกิน 70% อยู่แล้ว */
     var counts=bins.map(function(){return 0;});
     rows.forEach(function(r){ var p=num(r[COL.percent]); if(p==null) return; for(var i=0;i<bins.length;i++){ if(bins[i].test(p)){ counts[i]++; break; } } });
     var max=1; counts.forEach(function(c){ if(c>max) max=c; });
     var html='';
     bins.forEach(function(b,i){
       var w=Math.round(counts[i]/max*100);
-      html+='<div class="bar-row"><div class="lbl" style="width:96px">'+b.label+'</div><div class="track"><div class="fill" style="width:'+w+'%;background:'+b.color+'"></div></div><div class="num">'+counts[i]+'</div></div>';
+      html+='<div class="bar-row" data-tip="'+b.label+' : '+counts[i]+' คน"><div class="lbl" style="width:96px">'+b.label+'</div><div class="track"><div class="fill" style="width:'+w+'%;background:'+b.color+'"></div></div><div class="num">'+counts[i]+'</div></div>';
     });
     document.getElementById('percentChart').innerHTML=html;
   }
@@ -738,17 +800,18 @@
     };
     var grp={}, ord=[];
     records.forEach(function(r){
-      var k=sName(r).replace(/\s+/g,' ').trim()+'|'+(r[COL.cls]||'');
-      if(!grp[k]){ grp[k]={name:sName(r), cls:r[COL.cls]||'', recs:[]}; ord.push(k); }
+      var nm=String(r[COL.sName]||'').replace(/\s+/g,' ').trim();   // ชื่อ-สกุลล้วน (ไม่รวมคำนำหน้า → เรียงตามชื่อจริง)
+      var k=nm+'|'+(r[COL.cls]||'');
+      if(!grp[k]){ grp[k]={name:nm, prefix:sv(r[COL.sPrefix]), cls:r[COL.cls]||'', seat:sv(r[COL.seat]), recs:[]}; ord.push(k); }
       grp[k].recs.push(r);
     });
     var groups=ord.map(function(k){
       var x=grp[k], subs=subjAgg(x.recs), op=overallPct(x.recs);
       var sub=subs.map(function(s){ return [s.label, s.teachers, s.periods, s.present, s.absent, s.pct, s.remark]; });
-      return { main:[ x.name, x.cls, String(subs.length), (op==null?'–':op.toFixed(1)) ], opNum:op, sub:sub };
+      return { main:[ x.seat, x.name, x.cls, String(subs.length), (op==null?'–':op.toFixed(1)) ], prefix:x.prefix, opNum:op, sub:sub };
     });
     var csvRows=[];
-    ord.forEach(function(k){ var x=grp[k]; subjAgg(x.recs).forEach(function(s){ csvRows.push([ x.name, x.cls, s.label, s.teachers, s.periods, s.present, s.absent, s.pct, s.remark ]); }); });
+    ord.forEach(function(k){ var x=grp[k]; subjAgg(x.recs).forEach(function(s){ csvRows.push([ x.prefix, x.name, x.cls, s.label, s.teachers, s.periods, s.present, s.absent, s.pct, s.remark ]); }); });
     return { groups:groups, csvRows:csvRows };
   }
 
@@ -823,7 +886,7 @@
     });
   }
   var reportSort={ key:'date', dir:-1 }; // เริ่มเรียงวันที่ใหม่→เก่า
-  var studentSort={ key:null, dir:1 };   // เริ่มไม่เรียง (ตามลำดับเดิม) จนกว่าจะคลิกหัวคอลัมน์
+  var studentSort={ key:'cls', dir:1 };   // เริ่มเรียงตามชั้น → ในห้องเดียวกันเรียงเลขที่น้อย→มาก (ดูเป็นระเบียบ)
   // นิยามคอลัมน์ที่เรียงได้ของแต่ละการ์ด (label/key/ชนิด/ตัวดึงค่า)
   var REP_COLS=[
     {label:'ใบที่', key:'no', type:'date', center:true, w:'6%', get:function(g){return g.ts;}},
@@ -835,10 +898,12 @@
     {label:'% เฉลี่ย', key:'pct', type:'num', center:true, w:'9%', get:function(g){return g.avgNum;}}
   ];
   var STU_COLS=[
-    {label:'ชื่อ-สกุล', key:'name', type:'str', w:'40%', get:function(g){return g.main[0];}},
-    {label:'ชั้น/ห้อง', key:'cls', type:'str', center:true, w:'18%', get:function(g){return g.main[1];}},
-    {label:'จำนวนวิชา', key:'count', type:'num', center:true, w:'20%', get:function(g){return +g.main[2];}},
-    {label:'% เข้าเรียน (รวม)', key:'pct', type:'num', center:true, w:'22%', get:function(g){return g.opNum;}}
+    {label:'ชั้น/ห้อง', key:'cls', type:'str', center:true, w:'13%', get:function(g){return g.main[2];}, tie:function(g){return +g.main[0];}},
+    {label:'เลขที่', key:'seat', type:'num', center:true, w:'9%', get:function(g){return g.main[0];}},
+    {label:'คำนำหน้า', key:'prefix', type:'str', center:true, w:'11%', get:function(g){return g.prefix;}},
+    {label:'ชื่อ-สกุล', key:'name', type:'str', w:'27%', get:function(g){return g.main[1];}, alpha:true},
+    {label:'จำนวนวิชา', key:'count', type:'num', center:true, w:'18%', get:function(g){return +g.main[3];}},
+    {label:'% เข้าเรียน (รวม)', key:'pct', type:'num', center:true, w:'22%', get:function(g){return g.opNum;}, disp:function(g){return g.main[4];}}
   ];
   var teacherSort={ key:null, dir:1 };
   var TEA_COLS=[
@@ -868,10 +933,13 @@
     if(!c) return arr;
     var dir=st.dir;
     return arr.slice().sort(function(a,b){
-      var va=c.get(a), vb=c.get(b);
-      if(c.type==='num'){ var na=(va==null||va===''||isNaN(+va))?-Infinity:+va, nb=(vb==null||vb===''||isNaN(+vb))?-Infinity:+vb; return (na-nb)*dir; }
-      if(c.type==='date'){ return ((new Date(va).getTime()||0)-(new Date(vb).getTime()||0))*dir; }
-      return String(va==null?'':va).localeCompare(String(vb==null?'':vb),'th',{numeric:true})*dir;
+      var va=c.get(a), vb=c.get(b), r;
+      if(c.type==='num'){ var na=(va==null||va===''||isNaN(+va))?-Infinity:+va, nb=(vb==null||vb===''||isNaN(+vb))?-Infinity:+vb; r=(na-nb)*dir; }
+      else if(c.type==='date'){ r=((new Date(va).getTime()||0)-(new Date(vb).getTime()||0))*dir; }
+      else r=String(va==null?'':va).localeCompare(String(vb==null?'':vb),'th',{numeric:c.alpha?false:true})*dir;
+      // เรียงรอง (เช่น ชั้นเท่ากัน → เรียงเลขที่น้อย→มากเสมอ ไม่ว่าทิศหลักเป็นแบบใด)
+      if(r===0 && c.tie){ var ta=+c.tie(a), tb=+c.tie(b); r=((isNaN(ta)?Infinity:ta)-(isNaN(tb)?Infinity:tb)); }
+      return r;
     });
   }
   // ผูก event คลิกหัวคอลัมน์ → สลับทิศ/เปลี่ยนคอลัมน์ แล้ว render ใหม่
@@ -902,9 +970,9 @@
         title:'รายชื่อนักเรียนทั้งหมด',
         rawRows:rows,
         codesList:codesList,
-        headers:['ชื่อ-สกุล','ชั้น/ห้อง','จำนวนวิชา','% เข้าเรียน (รวม)'],
+        headers:['ชั้น/ห้อง','เลขที่','คำนำหน้า','ชื่อ-สกุล','จำนวนวิชา','% เข้าเรียน (รวม)'],
         subHeaders:['วิชา (รหัส)','ครูผู้สอน','คาบ','มา','ขาด','% เข้าเรียน','หมายเหตุ'],
-        csvHeaders:['ชื่อ-สกุล','ชั้น/ห้อง','วิชา (รหัส)','ครูผู้สอน','คาบ','มา','ขาด','% เข้าเรียน','หมายเหตุ']
+        csvHeaders:['คำนำหน้า','ชื่อ-สกุล','ชั้น/ห้อง','วิชา (รหัส)','ครูผู้สอน','คาบ','มา','ขาด','% เข้าเรียน','หมายเหตุ']
       };
     }
     if(type==='reports'){
@@ -978,22 +1046,30 @@
     var cfg=buildCardData(type, applySort(applyFilters()));
     cardCurrent=cfg;
     document.getElementById('cardModalTitle').textContent=cfg.title;
+    var _sc=document.querySelector('#cardModal .rm-scroll'); if(_sc) _sc.scrollTop=0;  // เปิดการ์ดใหม่ = เริ่มบนสุดเสมอ
+    var _tb=document.getElementById('cardTopBtn'); if(_tb) _tb.classList.remove('show');
     // ขยายกล่องให้กว้างเท่าหน้าเว็บเฉพาะการ์ดรายชื่อนักเรียน — การ์ดอื่นใช้ขนาดปกติ
     var rmBox=document.querySelector('#cardModal .rm-box');
-    if(rmBox) rmBox.classList.toggle('rm-wide', !!(cfg.studentMode || cfg.reportMode));
+    if(rmBox) rmBox.classList.toggle('rm-wide', !!(cfg.studentMode || cfg.reportMode || cfg.teacherMode || cfg.subjectMode));
     var body=document.getElementById('cardModalBody');
     // ===== โหมดรายชื่อนักเรียน: มีแถบกรองของตัวเอง (ค้นหาชื่อ / ช่วง % / รหัสวิชา) =====
     if(cfg.studentMode){
       var opts='<option value="">ทุกวิชา</option>'+cfg.codesList.map(function(c){ return '<option value="'+esc(c.code)+'">'+esc(c.label)+'</option>'; }).join('');
       var levels=uniq(cfg.rawRows.map(function(r){ return parseClass(r[COL.cls]).level; }).filter(Boolean)).sort(function(a,b){ return (+a)-(+b); });
       var gopts='<option value="">ทุกระดับชั้น</option>'+levels.map(function(l){ return '<option value="'+esc(l)+'">ม.'+esc(l)+'</option>'; }).join('');
+      var hasLong=cfg.rawRows.some(function(r){ return r[COL.remark]==='ขาดเรียนนาน'; }), hasOther=cfg.rawRows.some(function(r){ return r[COL.remark]!=='ขาดเรียนนาน'; });
+      var ropts='<option value="">ทุกหมายเหตุ</option>'+(hasLong?'<option value="ขาดเรียนนาน">ขาดเรียนนาน</option>':'')+(hasOther?'<option value="__other__">อื่นๆ</option>':'');
+      var prefs=uniq(cfg.rawRows.map(function(r){ return r[COL.sPrefix]; }).filter(Boolean)).sort();
+      var ppts='<option value="">ทุกคำนำหน้า</option>'+prefs.map(function(p){ return '<option value="'+esc(p)+'">'+esc(p)+'</option>'; }).join('');
       body.innerHTML=''
         +'<div class="stu-filter">'
         +'<div class="fld grow"><label>ค้นหาชื่อนักเรียน</label><input type="text" id="stuQ" placeholder="พิมพ์ชื่อ..."></div>'
         +'<div class="fld"><label>ระดับชั้น</label><select id="stuGrade">'+gopts+'</select></div>'
         +'<div class="fld"><label>ห้อง</label><select id="stuRoom" disabled><option value="">เลือกระดับชั้นก่อน</option></select></div>'
+        +'<div class="fld"><label>คำนำหน้า</label><select id="stuPrefix">'+ppts+'</select></div>'
         +'<div class="fld"><label>ช่วง % เข้าเรียนรวม</label><select id="stuPct"><option value="">ทั้งหมด</option><option value="0-49">น้อยกว่า 50</option><option value="50-59">50 - 59</option><option value="60-69">60 - 69</option><option value="70+">70 ขึ้นไป</option></select></div>'
         +'<div class="fld"><label>รหัสวิชา</label><select id="stuCode">'+opts+'</select></div>'
+        +'<div class="fld"><label>หมายเหตุ</label><select id="stuRemark">'+ropts+'</select></div>'
         +'</div>'
         +'<div class="stu-count" id="stuCount"></div>'
         +'<div id="stuTableWrap"></div>';
@@ -1009,11 +1085,14 @@
       document.getElementById('stuQ').addEventListener('input', doRender);
       document.getElementById('stuGrade').addEventListener('change', function(){ updateStuRoom(); doRender(); });
       document.getElementById('stuRoom').addEventListener('change', doRender);
+      document.getElementById('stuPrefix').addEventListener('change', doRender);
       document.getElementById('stuPct').addEventListener('change', doRender);
       document.getElementById('stuCode').addEventListener('change', doRender);
+      document.getElementById('stuRemark').addEventListener('change', doRender);
       renderStudentTable(cfg);
       document.getElementById('cardModal').classList.add('show');
       document.body.style.overflow='hidden';
+      syncPopupFilterTop();
       return;
     }
     // ===== โหมดวิชา: ตัวกรอง (ค้นหาวิชา/กรองครู) + เรียงลำดับ + กดขยายดูนักเรียนในวิชา =====
@@ -1032,6 +1111,7 @@
       renderSubjectCardTable(cfg);
       document.getElementById('cardModal').classList.add('show');
       document.body.style.overflow='hidden';
+      syncPopupFilterTop();
       return;
     }
     // ===== โหมดครู: ตัวกรอง (ค้นหาครู/รหัสวิชา) + เรียงลำดับ + กดขยายดูใบของครู =====
@@ -1050,6 +1130,7 @@
       renderTeacherTable(cfg);
       document.getElementById('cardModal').classList.add('show');
       document.body.style.overflow='hidden';
+      syncPopupFilterTop();
       return;
     }
     // ===== โหมดใบรายงาน: ตัวกรอง (ค้นหา/ครู/วิชา/ช่วงวันที่) + เรียงลำดับ + กดขยายดูรายชื่อในใบ =====
@@ -1075,6 +1156,7 @@
       renderReportTable(cfg);
       document.getElementById('cardModal').classList.add('show');
       document.body.style.overflow='hidden';
+      syncPopupFilterTop();
       return;
     }
     // ===== ตารางแบบกดขยาย (สำรองสำหรับการ์ดอื่นในอนาคต) — 1 แถวต่อคน กดดูรายวิชา/ครู =====
@@ -1109,6 +1191,7 @@
       });
       document.getElementById('cardModal').classList.add('show');
       document.body.style.overflow='hidden';
+      syncPopupFilterTop();
       return;
     }
     var html='';
@@ -1139,12 +1222,16 @@
     var code=document.getElementById('stuCode').value;
     var gEl=document.getElementById('stuGrade'), rEl=document.getElementById('stuRoom');
     var grade=gEl?gEl.value:'', room=rEl?rEl.value:'';
-    // กรองที่ระดับ record ก่อน: ระดับชั้น + ห้อง + รหัสวิชา + ชื่อนักเรียน
+    var rmEl=document.getElementById('stuRemark'); var rmk=rmEl?rmEl.value:'';
+    var pfEl=document.getElementById('stuPrefix'); var pf=pfEl?pfEl.value:'';
+    // กรองที่ระดับ record ก่อน: ระดับชั้น + ห้อง + รหัสวิชา + หมายเหตุ + ชื่อนักเรียน
     var recs=cfg.rawRows.filter(function(r){
       var pc=parseClass(r[COL.cls]);
       if(grade && pc.level!==grade) return false;
       if(room && pc.room!==room) return false;
+      if(pf && (r[COL.sPrefix]||'')!==pf) return false;
       if(code){ if(String(r[COL.code]||'').replace(/\s+/g,'').trim()!==code) return false; }
+      if(rmk){ if(rmk==='__other__'){ if(r[COL.remark]==='ขาดเรียนนาน') return false; } else if(r[COL.remark]!==rmk) return false; }
       if(q){ var nm=((r[COL.sPrefix]||'')+r[COL.sName]).toLowerCase(); if(nm.indexOf(q)<0) return false; }
       return true;
     });
@@ -1161,8 +1248,8 @@
     });
     groups=applySortState(groups, STU_COLS, studentSort);
     // CSV ตามที่กรอง (เฉพาะนักเรียนที่เหลือ)
-    var keep={}; groups.forEach(function(g){ keep[g.main[0]+'|'+g.main[1]]=1; });
-    cardCurrent.csv={ headers:cfg.csvHeaders, rows:built.csvRows.filter(function(row){ return keep[row[0]+'|'+row[1]]; }) };
+    var keep={}; groups.forEach(function(g){ keep[g.main[1]+'|'+g.main[2]]=1; });
+    cardCurrent.csv={ headers:cfg.csvHeaders, rows:built.csvRows.filter(function(row){ return keep[row[1]+'|'+row[2]]; }) };
     document.getElementById('cardModalTitle').textContent='รายชื่อนักเรียนทั้งหมด ('+groups.length+' คน)';
     document.getElementById('stuCount').textContent='พบ '+groups.length+' คน'+( (q||pr||code) ? ' (กรองแล้ว)' : '' );
     var wrap=document.getElementById('stuTableWrap');
@@ -1170,9 +1257,9 @@
     var eh='<table class="rm-table rm-exp"><thead><tr>'+sortHeadHTML(STU_COLS, studentSort)+'</tr></thead><tbody>';
     groups.forEach(function(g,gi){
       eh+='<tr class="exp-main" data-gi="'+gi+'"><td class="exp-toggle"><span class="exp-arrow">▶</span></td>';
-      g.main.forEach(function(c,ci){ eh+='<td'+(ci===0?' data-tip="กดเพื่อดู / ซ่อนรายวิชาที่ขาด"':(STU_COLS[ci]&&STU_COLS[ci].center?' class="num"':''))+'>'+esc(c)+'</td>'; });
+      STU_COLS.forEach(function(col,ci){ var cn=col.center?' class="num"':''; var v=(col.disp||col.get)(g); eh+='<td'+cn+(ci===0?' data-tip="กดเพื่อดู / ซ่อนรายวิชาที่ขาด"':'')+'>'+esc(v==null?'':v)+'</td>'; });
       eh+='</tr>';
-      eh+='<tr class="exp-sub" data-gi="'+gi+'" style="display:none"><td></td><td colspan="'+cfg.headers.length+'">';
+      eh+='<tr class="exp-sub" data-gi="'+gi+'" style="display:none"><td></td><td colspan="'+STU_COLS.length+'">';
       eh+='<table class="rm-subtable rm-sub-stu"><thead><tr>';
       cfg.subHeaders.forEach(function(sh){ eh+='<th>'+esc(sh)+'</th>'; });
       eh+='</tr></thead><tbody>';
@@ -1354,10 +1441,43 @@
   document.getElementById('cardCloseBtn').addEventListener('click', closeCardModal);
   document.getElementById('cardCsvBtn').addEventListener('click', cardExportCSV);
   // ไม่ผูก backdrop click — ป๊อปอัปปิดได้เฉพาะปุ่มปิด
+  // ปุ่มขึ้นบนสุดในป๊อปอัป — โผล่เมื่อเลื่อนลง, กดแล้วเลื่อนขึ้นบนสุด (ใช้ทุกการ์ด เพราะ rm-scroll ตัวเดียว)
+  (function(){
+    var sc=document.querySelector('#cardModal .rm-scroll'), btn=document.getElementById('cardTopBtn');
+    if(sc&&btn){
+      sc.addEventListener('scroll', function(){ btn.classList.toggle('show', sc.scrollTop>200); });
+      btn.addEventListener('click', function(){ sc.scrollTo({top:0, behavior:'smooth'}); });
+    }
+  })();
+
+  // ล้างตัวกรองในป๊อปอัป (ทุกการ์ด) — รีเซ็ตช่องกรอง + render ใหม่ตามชนิดการ์ด
+  function clearPopupFilter(){
+    if(!cardCurrent) return;
+    var f=document.querySelector('#cardModalBody .stu-filter');
+    if(f){ f.querySelectorAll('input').forEach(function(i){ i.value=''; }); f.querySelectorAll('select').forEach(function(s){ s.value=''; }); }
+    var rm=document.getElementById('stuRoom'); if(rm){ rm.innerHTML='<option value="">เลือกระดับชั้นก่อน</option>'; rm.disabled=true; }
+    if(cardCurrent.studentMode) renderStudentTable(cardCurrent);
+    else if(cardCurrent.reportMode) renderReportTable(cardCurrent);
+    else if(cardCurrent.teacherMode) renderTeacherTable(cardCurrent);
+    else if(cardCurrent.subjectMode) renderSubjectCardTable(cardCurrent);
+  }
+  document.getElementById('cardModalBody').addEventListener('click', function(e){
+    if(e.target && e.target.closest && e.target.closest('.stu-clear')) clearPopupFilter();
+  });
+  // หัวตารางในป๊อปอัปตรึงใต้แถบกรอง (ที่ sticky) → ตั้ง --popfh = ความสูงแถบกรอง
+  function syncPopupFilterTop(){
+    var f=document.querySelector('#cardModalBody .stu-filter');
+    if(f && !f.querySelector('.stu-clear')){
+      var b=document.createElement('button'); b.type='button'; b.className='stu-clear'; b.textContent='✕ ล้างค่า';
+      f.appendChild(b); // ปุ่มล้างค่า (delegated click → clearPopupFilter)
+    }
+    document.documentElement.style.setProperty('--popfh', (f?f.offsetHeight:0)+'px');
+  }
+  window.addEventListener('resize', syncPopupFilterTop);
 
   function renderTable(rows){
     var tb=document.getElementById('tbody');
-    if(!rows.length){ tb.innerHTML='<tr><td colspan="10" class="empty-hint">ไม่พบข้อมูลตามเงื่อนไข</td></tr>'; return; }
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="13" class="empty-hint">ไม่พบข้อมูลตามเงื่อนไข</td></tr>'; return; }
     var grpIdx=0, prevTs=' '; // จัดกลุ่ม "ใบเดียวกัน" ด้วย timestamp → สลับสีพื้นต่อใบ
     tb.innerHTML=rows.map(function(r){
       var p=num(r[COL.percent]);
@@ -1373,11 +1493,14 @@
         '<td>'+esc((r[COL.tPrefix]||'')+r[COL.tName])+'</td>'+
         '<td>'+esc(r[COL.subject])+'<div style="font-size:12px;color:#9ca3af">'+esc(r[COL.code])+'</div></td>'+
         '<td style="text-align:center">'+esc(r[COL.seat])+'</td>'+
-        '<td>'+esc((r[COL.sPrefix]||'')+r[COL.sName])+'</td>'+
+        '<td style="text-align:center">'+esc(r[COL.sPrefix])+'</td>'+
+        '<td>'+esc(r[COL.sName])+'</td>'+
         '<td style="text-align:center">'+esc(r[COL.cls])+'</td>'+
+        '<td style="text-align:center">'+esc(r[COL.periods])+'</td>'+
+        '<td style="text-align:center">'+esc(r[COL.present])+'</td>'+
+        '<td style="text-align:center">'+esc(r[COL.absent])+'</td>'+
         '<td style="text-align:center"'+pCls+'>'+(p!=null?p.toFixed(1):esc(r[COL.percent]))+'</td>'+
         '<td>'+remHtml+'</td>'+
-        '<td><span class="badge badge-saved">บันทึกแล้ว</span></td>'+
         '<td><button class="btn-pdf-row" data-ts="'+ts+'">📄 PDF</button></td>'+
       '</tr>';
     }).join('');
@@ -1502,6 +1625,7 @@
         percent:r[COL.percent], remark:r[COL.remark]
       }; })
     };
+    currentDocData=d;
     printArea.innerHTML=buildDoc(d);
     pdfModal.classList.add('show'); document.body.style.overflow='hidden';
     var go=function(){ requestAnimationFrame(function(){ requestAnimationFrame(fitNames); }); };
@@ -1513,6 +1637,105 @@
   document.getElementById('closePdfBtn').addEventListener('click', closePdf);
   // หน้า PDF ปิดได้เฉพาะปุ่ม "ปิด" เท่านั้น — กดพื้นที่ว่างรอบๆ ไม่ปิด (กันปิดพลาดตอนกำลังดู/พิมพ์)
   document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
+  // ===== บันทึก PDF เป็นตัวหนังสือจริงด้วย pdfmake (ฟอนต์ไทยเป๊ะ ไม่เพี้ยน เพราะไม่ได้แปลงเป็นรูปภาพ) =====
+  var _thaiFontReady=null, _crestData=null;
+  function _b64(buf){ var b=new Uint8Array(buf), s='', n=b.length, c=8192; for(var i=0;i<n;i+=c){ s+=String.fromCharCode.apply(null, b.subarray(i,i+c)); } return btoa(s); }
+  // โหลดฟอนต์ Sarabun (ฟอนต์ราชการ) จาก CDN แล้วฝังเข้า pdfmake — โหลดครั้งเดียวพอ
+  function loadThaiFont(){
+    if(_thaiFontReady) return _thaiFontReady;
+    var base='https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/';
+    _thaiFontReady=Promise.all([
+      fetch(base+'Sarabun-Regular.ttf').then(function(r){ if(!r.ok) throw 0; return r.arrayBuffer(); }),
+      fetch(base+'Sarabun-Bold.ttf').then(function(r){ if(!r.ok) throw 0; return r.arrayBuffer(); })
+    ]).then(function(b){
+      pdfMake.vfs=pdfMake.vfs||{};
+      pdfMake.vfs['Sarabun-Regular.ttf']=_b64(b[0]);
+      pdfMake.vfs['Sarabun-Bold.ttf']=_b64(b[1]);
+      pdfMake.fonts={ Sarabun:{ normal:'Sarabun-Regular.ttf', bold:'Sarabun-Bold.ttf', italics:'Sarabun-Regular.ttf', bolditalics:'Sarabun-Bold.ttf' } };
+    });
+    return _thaiFontReady;
+  }
+  // โหลดโลโก้ครุฑเป็น dataURL (ถ้าไม่มีไฟล์ก็ข้าม ไม่ error)
+  function loadCrest(){
+    if(_crestData!==null) return Promise.resolve(_crestData);
+    return fetch('logo.png').then(function(r){ if(!r.ok) throw 0; return r.blob(); }).then(function(bl){
+      return new Promise(function(res){ var fr=new FileReader(); fr.onload=function(){ _crestData=fr.result; res(_crestData); }; fr.onerror=function(){ _crestData=''; res(''); }; fr.readAsDataURL(bl); });
+    }).catch(function(){ _crestData=''; return ''; });
+  }
+  // แปลงข้อมูลเอกสาร → โครงสร้าง pdfmake (เลย์เอาต์ตรงกับเอกสารราชการ)
+  function buildPdfMakeDoc(d, crest){
+    var sx=function(v){ return (v==null)?'':String(v); };
+    var rows=d.students.filter(function(s){ return s.name; });
+    var total=Math.max(MIN_DOC_ROWS, rows.length);
+    var body=[
+      [ {text:'ที่',rowSpan:2,style:'th'},{text:'ชื่อ – สกุล',rowSpan:2,style:'th'},{text:'เลขที่',rowSpan:2,style:'th'},{text:'ชั้น/ห้อง',rowSpan:2,style:'th'},{text:'จำนวนชั่วโมง',colSpan:3,style:'th'},'','',{text:'%\nการเข้าเรียน',rowSpan:2,style:'th'},{text:'หมายเหตุ',rowSpan:2,style:'th'} ],
+      [ '','','','',{text:'ทั้งหมด',style:'th'},{text:'มาเรียน',style:'th'},{text:'ขาดเรียน',style:'th'},'','' ]
+    ];
+    for(var i=0;i<total;i++){
+      var s=rows[i];
+      if(s){
+        var full=(s.prefix||'')+s.name, long=(s.remark==='ขาดเรียนนาน');
+        body.push([ {text:String(i+1),style:'tc'},{text:full,style:'tcL'},{text:sx(s.seat),style:'tc'},{text:sx(s.classroom),style:'tc'},{text:sx(s.periods),style:'tc'},{text:sx(s.present),style:'tc'},{text:sx(s.absent),style:'tc'},{text:sx(s.percent),style:'tc'},{text:sx(s.remark),style:(long?'tcLong':'tcL')} ]);
+      } else {
+        body.push([ {text:String(i+1),style:'tc'},'','','','','','','','' ]);
+      }
+    }
+    var head=crest
+      ? { columns:[ {width:'*',text:''}, {width:64, image:crest, fit:[64,64], alignment:'center'}, {width:'*', text:'โรงเรียนชานุมานวิทยาคม', alignment:'right', bold:true, fontSize:14, margin:[0,8,0,0]} ] }
+      : { text:'โรงเรียนชานุมานวิทยาคม', alignment:'right', bold:true, fontSize:14 };
+    return {
+      pageSize:'A4', pageMargins:[32,38,32,38],
+      defaultStyle:{ font:'Sarabun', fontSize:16, lineHeight:1.15 },
+      content:[
+        head,
+        { text:'แบบส่งรายชื่อนักเรียนที่มีเวลาเรียนไม่ถึง '+THRESHOLD+' %', bold:true, fontSize:18, alignment:'center', margin:[0,4,0,12] },
+        { text:thaiDate(d.dateInput), alignment:'right', margin:[0,0,0,10] },
+        { text:[ 'ข้าพเจ้า ', {text:(d.teacherPrefix||'')+d.teacherName,bold:true},
+            ' กลุ่มสาระการเรียนรู้ ', {text:ob(d.subjectGroup),bold:true},
+            ' ได้รับมอบหมายให้ปฏิบัติหน้าที่สอนในรายวิชา ', {text:ob(d.subjectName),bold:true},
+            ' รหัสวิชา ', {text:ob(d.subjectCode),bold:true},
+            ' เวลาเรียนต่อสัปดาห์ ', {text:ob(d.hoursPerWeek),bold:true}, ' ชั่วโมง',
+            ' ประจำภาคเรียนที่ ', {text:ob(d.semester),bold:true},
+            ' ปีการศึกษา ', {text:ob(d.academicYear),bold:true},
+            ' มีนักเรียนเวลาเรียนไม่ถึง '+THRESHOLD+' % ดังต่อไปนี้' ], alignment:'justify', lineHeight:1.5, margin:[0,0,0,14] },
+        { table:{ headerRows:2, widths:[20,'*',32,46,44,44,48,62,54], body:body },
+          layout:{ hLineWidth:function(){return 0.8;}, vLineWidth:function(){return 0.8;}, hLineColor:function(){return '#000';}, vLineColor:function(){return '#000';}, paddingLeft:function(){return 2;}, paddingRight:function(){return 2;}, paddingTop:function(){return 5;}, paddingBottom:function(){return 5;} } },
+        { columns:[ {width:'*',text:''}, {width:250, alignment:'center', margin:[0,26,0,0], stack:[
+            {text:'จึงเรียนมาเพื่อโปรดพิจารณา', margin:[0,0,0,18]},
+            {text:'ลงชื่อ ................................................'},
+            {text:'( '+(d.teacherPrefix||'')+d.teacherName+' )', margin:[0,4,0,0]},
+            {text:'ครูประจำวิชา', margin:[0,2,0,0]}
+        ] } ] }
+      ],
+      styles:{
+        th:{ bold:true, fontSize:11, alignment:'center', fillColor:'#e5e7eb' },
+        tc:{ fontSize:14, alignment:'center' },
+        tcL:{ fontSize:14, alignment:'left' },
+        tcLong:{ fontSize:14, alignment:'left', color:'#dc2626', bold:true }
+      }
+    };
+  }
+  // ตั้งชื่อไฟล์ PDF ให้กระชับ + สื่อถึงข้อมูลในใบ: รายชื่อไม่ถึง70_[วิชา]_[ห้องถ้าห้องเดียว]_[วันที่]
+  function pdfFileName(d){
+    var cl=function(s){ return String(s||'').replace(/[\\/]/g,'-').replace(/[:*?"<>|]/g,'').replace(/\s+/g,' ').trim(); };
+    var subj=cl(d.subjectName)||'รายงาน';
+    var rooms=uniq((d.students||[]).filter(function(s){ return s.name; }).map(function(s){ return s.classroom; }).filter(Boolean));
+    var room=(rooms.length===1)?cl(rooms[0]):'';
+    var date=cl(fmtDate(d.dateInput||''));
+    var parts=['รายชื่อไม่ถึง'+THRESHOLD, subj]; if(room) parts.push(room); if(date) parts.push(date);
+    return parts.join('_')+'.pdf';
+  }
+  // ปุ่มบันทึก PDF → สร้างด้วย pdfmake (ฟอนต์ไทยเป๊ะ) · ถ้าพลาด → fallback หน้าต่างพิมพ์
+  document.getElementById('savePdfBtn').addEventListener('click', function(){
+    var btn=this, old=btn.textContent;
+    if(!currentDocData || typeof pdfMake==='undefined'){ window.print(); return; }
+    btn.disabled=true; btn.textContent='⏳ กำลังสร้าง PDF...';
+    var done=function(){ btn.disabled=false; btn.textContent=old; };
+    Promise.all([ loadThaiFont(), loadCrest() ]).then(function(res){
+      var doc=buildPdfMakeDoc(currentDocData, res[1]||null);
+      pdfMake.createPdf(doc).download(pdfFileName(currentDocData), done);
+    }).catch(function(e){ console.warn('pdfmake fail',e); done(); window.print(); });
+  });
 </script>
 </body>
 </html>
