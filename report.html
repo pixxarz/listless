@@ -273,6 +273,9 @@
       .od-table tr{ page-break-inside:avoid; }
       @page{ size:A4 portrait; margin:14mm; }
     }
+    /* Toast เด้งเตือนรายงานใหม่ (มุมขวาล่าง) */
+    .rt-toast{ position:fixed; right:20px; bottom:20px; max-width:340px; background:linear-gradient(135deg,#7c3aed,#6d28d9); color:#fff; padding:14px 20px; border-radius:14px; font-size:15px; font-weight:600; box-shadow:0 10px 30px rgba(76,29,149,.4); z-index:9999; opacity:0; transform:translateY(20px); transition:opacity .3s, transform .3s; pointer-events:none; }
+    .rt-toast.show{ opacity:1; transform:translateY(0); }
   </style>
   <!-- html2pdf — สำรองไว้ (เผื่อ fallback) -->
   <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.3/dist/html2pdf.bundle.min.js"></script>
@@ -414,6 +417,8 @@
   </div>
 </div>
 
+<div id="rtToast" class="rt-toast"></div>
+
 <script>
   // ====== ค่าคงที่ ======
   var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
@@ -428,6 +433,35 @@
     periods:'คาบทั้งหมด', present:'มาเรียน', absent:'ขาดเรียน', percent:'% การเข้าเรียน', remark:'หมายเหตุ' };
 
   var allRows=[];
+  var currentPass='', pollTimer=null, polling=false, seenTs={};
+
+  // ====== Toast เด้งเตือน (มุมขวาล่าง) ======
+  function showToast(msg){
+    var t=document.getElementById('rtToast'); if(!t) return;
+    t.textContent=msg; t.className='rt-toast show';
+    clearTimeout(showToast._tm); showToast._tm=setTimeout(function(){ t.className='rt-toast'; }, 6000);
+  }
+
+  // ====== เรียลไทม์ (polling) — เช็ครายงานใหม่อัตโนมัติทุก ~45 วินาที ======
+  // Google Sheet ไม่มี push สด → ใช้วิธีดึงซ้ำเป็นระยะ แล้วเทียบ timestamp ว่ามีใบใหม่ไหม
+  function snapshotSeen(){ seenTs={}; allRows.forEach(function(r){ var t=String(r[COL.ts]||''); if(t) seenTs[t]=1; }); }
+  function startRealtime(){ snapshotSeen(); if(pollTimer) clearInterval(pollTimer); pollTimer=setInterval(pollNew, 45000); }
+  function pollNew(){
+    if(polling || document.hidden || !currentPass) return;   // แท็บไม่ได้เปิดอยู่ = ข้าม (ประหยัด quota)
+    polling=true;
+    jsonp({ key:currentPass }, function(data){
+      polling=false;
+      if(!data || data.result!=='OK' || !data.rows) return;
+      var rows=data.rows, newTs={}, cnt=0;
+      rows.forEach(function(r){ var t=String(r[COL.ts]||''); if(t && !seenTs[t] && !newTs[t]){ newTs[t]=1; cnt++; } });
+      if(cnt>0){
+        allRows=rows;
+        rows.forEach(function(r){ var t=String(r[COL.ts]||''); if(t) seenTs[t]=1; });
+        render();   // สร้างตาราง/กราฟ/KPI ใหม่ทันที (คงตัวกรอง+การเรียงที่ผู้ใช้เลือกอยู่)
+        showToast('🔔 มีรายงานใหม่เข้ามา '+cnt+' ใบ — อัปเดตตารางให้แล้ว');
+      }
+    });
+  }
 
   // ====== JSONP (เลี่ยง CORS) ======
   var jsonpId=0;
@@ -452,6 +486,7 @@
     jsonp({ key:pass }, function(data){
       if(data && data.result==='OK'){
         allRows=data.rows||[];
+        currentPass=pass;   // เก็บใน memory (หายเมื่อปิด/รีเฟรชหน้า) เพื่อใช้เช็ครายงานใหม่อัตโนมัติ
         gate.classList.add('hidden'); main.classList.remove('hidden');
         initApp();
       } else if(data && data.error==='unauthorized'){
@@ -513,6 +548,7 @@
       updateArrows(); render();
     });
     render();
+    startRealtime();   // เริ่มเช็ครายงานใหม่อัตโนมัติทุก ~45 วินาที
   }
 
   function buildFilterOptions(){
@@ -750,8 +786,12 @@
   function fmtDate(v){
     if(!v) return '';
     var s=String(v);
-    // ถ้าเป็น ISO datetime (timestamp) → ตัดเอาเฉพาะวันที่
-    if(s.indexOf('T')>0){ var d=s.split('T')[0].split('-'); if(d.length===3) return d[2]+'/'+d[1]+'/'+(parseInt(d[0],10)+543); }
+    // ISO datetime (timestamp/Date จากชีต) → แปลงเป็นเวลาไทย (+7) ก่อนเอาวันที่ กัน timezone เพี้ยน -7 ชม. (วันที่ 8 กลายเป็น 7)
+    if(s.indexOf('T')>0){
+      var dt=new Date(s);
+      if(!isNaN(dt.getTime())){ var th=new Date(dt.getTime()+7*3600*1000), p2=function(n){ return ('0'+n).slice(-2); }; return p2(th.getUTCDate())+'/'+p2(th.getUTCMonth()+1)+'/'+(th.getUTCFullYear()+543); }
+      var d=s.split('T')[0].split('-'); if(d.length===3) return d[2]+'/'+d[1]+'/'+(parseInt(d[0],10)+543);
+    }
     if(/^\d{4}-\d{2}-\d{2}/.test(s)){ var p=s.substr(0,10).split('-'); return p[2]+'/'+p[1]+'/'+(parseInt(p[0],10)+543); }
     return s;
   }
@@ -1531,7 +1571,13 @@
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function thaiDate(iso){
     if(!iso) return 'วันที่ ............ เดือน ........................ พ.ศ. ............';
-    var s=String(iso); if(s.indexOf('T')>0) s=s.split('T')[0];
+    var s=String(iso);
+    // ISO datetime จากชีต → แปลงเป็นเวลาไทย (+7) ก่อน กัน timezone เพี้ยน -7 ชม. (วันที่ 8 กลายเป็น 7)
+    if(s.indexOf('T')>0){
+      var dt=new Date(s);
+      if(!isNaN(dt.getTime())){ var th=new Date(dt.getTime()+7*3600*1000); return 'วันที่ '+th.getUTCDate()+' เดือน '+(THAI_MONTHS[th.getUTCMonth()+1]||'')+' พ.ศ. '+(th.getUTCFullYear()+543); }
+      s=s.split('T')[0];
+    }
     var p=s.split('-'); if(p.length<3) return s;
     var y=parseInt(p[0],10)+543, m=parseInt(p[1],10), d=parseInt(p[2],10);
     return 'วันที่ '+d+' เดือน '+(THAI_MONTHS[m]||'')+' พ.ศ. '+y;
