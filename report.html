@@ -153,6 +153,12 @@
     .rm-foot{ display:flex; gap:12px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap; }
     .rm-csv{ background:linear-gradient(135deg,#14b8a6,#0d9488); color:#fff; border:none; border-radius:22px; padding:10px 26px; font-family:inherit; font-size:15px; font-weight:600; cursor:pointer; }
     .rm-csv:hover{ filter:brightness(1.08); }
+    /* ปุ่มปริ้นบัญชีรายชื่อ (เฉพาะการ์ดรายชื่อนักเรียน) — เขียว=ทั้งหมด, น้ำเงิน=ตามกรอง */
+    .rm-print{ background:linear-gradient(135deg,#fb7185,#e11d48); color:#fff; border:none; border-radius:22px; padding:10px 24px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(225,29,72,.35); }   /* ปริ้นทั้งหมด = ชมพูแดงสด เด่นสุด */
+    .rm-print.alt{ background:#fde7ef; color:#be185d; border:1.5px solid #f6a5c0; font-weight:600; box-shadow:none; }   /* ปริ้นตามที่กรอง = ชมพูอ่อน รองลงมา */
+    .rm-print:hover{ filter:brightness(1.06); }
+    .rm-print.alt:hover{ background:#fbcfe0; filter:none; }
+    .rm-print:disabled{ opacity:.5; cursor:not-allowed; filter:none; }
     .rm-close{ background:#f5f3ff; color:#6d28d9; border:1.5px solid var(--purple); border-radius:22px; padding:10px 32px; font-family:inherit; font-size:15px; font-weight:600; cursor:pointer; }
     .rm-close:hover{ background:var(--purple); color:#fff; }
 
@@ -275,6 +281,28 @@
     .od-sign .sign-block::after{ content:''; display:block; clear:both; }
     .od-sign-clear{ clear:both; }
 
+    /* ===== เอกสาร "บัญชีรายชื่อนักเรียนไม่ถึง 70%" (รวมทุกวิชา จัดกลุ่มตามระดับชั้น) ===== */
+    .sl-head{ position:relative; text-align:center; margin-bottom:8px; min-height:80px; }
+    .sl-head .sl-school{ position:absolute; top:2px; right:0; text-align:right; font-size:14pt; font-weight:700; line-height:1.4; }
+    .sl-head img{ height:60px; width:auto; display:inline-block; }
+    .sl-title{ font-size:18pt; font-weight:700; line-height:1.35; margin-top:4px; }
+    .sl-meta{ text-align:center; font-size:14pt; margin:2px 0; }
+    .sl-cond{ font-size:13pt; color:#333; margin-top:4px; }   /* บรรทัดบรรยายขอบเขตข้อมูล (ตอนปริ้นตามที่กรอง) */
+    .sl-asof{ text-align:right; font-size:13pt; margin:8px 0 12px; }
+    .sl-grade{ font-size:14pt; font-weight:700; background:#dbeafe; border:1px solid #000; border-bottom:none; padding:5px 10px; margin-top:16px; }
+    .sl-grade:first-of-type{ margin-top:0; }
+    .sl-table{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:13pt; margin-bottom:4px; }
+    .sl-table th,.sl-table td{ border:1px solid #000; padding:4px 5px; text-align:center; vertical-align:middle; word-break:break-word; overflow-wrap:break-word; box-sizing:border-box; }
+    .sl-stu td{ background:#eff6ff; font-weight:700; }                 /* แถวหัวนักเรียน = ฟ้าจางมาก (เข้าชุดหัวชั้น ดูทางการ) */
+    .sl-stu td.sl-name{ text-align:left; padding-left:8px; }
+    .sl-stu .sl-lbl{ display:block; font-size:9.5pt; font-weight:400; line-height:1.2; }   /* label ตัวเล็กในแถวหัวนักเรียน */
+    .sl-subhead th{ background:#f3f4f6; font-weight:700; font-size:10.5pt; line-height:1.25; }
+    .sl-sub td{ font-size:12pt; }
+    .sl-sub td.sl-subj{ text-align:left; padding-left:12px; }
+    .sl-sub td.sl-tea{ text-align:left; padding-left:6px; }
+    .sl-long{ color:#dc2626; font-weight:700; }                       /* หมายเหตุ "ขาดเรียนนาน" = แดง */
+    .sl-empty{ text-align:center; font-size:14pt; padding:30px 0; }
+
     @media print{
       body{ background:#fff !important; padding:0 !important; }
       .wrap,.float-print,.float-close,.print-hint,.rm-backdrop{ display:none !important; }
@@ -283,6 +311,9 @@
       .od-table{ page-break-inside:auto; }
       .od-table thead{ display:table-header-group; }
       .od-table tr{ page-break-inside:avoid; }
+      .sl-table{ page-break-inside:auto; }
+      .sl-table tr{ page-break-inside:avoid; }                          /* ไม่ตัดกลางแถว */
+      .sl-grade{ page-break-after:avoid; break-after:avoid; page-break-inside:avoid; }  /* หัวชั้นไม่ห้อยท้ายหน้า */
       @page{ size:A4 portrait; margin:14mm; }
     }
     /* Toast เด้งเตือนรายงานใหม่ (มุมขวาล่าง) */
@@ -418,6 +449,8 @@
     <div class="rm-scroll"><div id="cardModalBody"></div></div>
     <button type="button" class="card-top-btn" id="cardTopBtn" title="ขึ้นบนสุด" aria-label="ขึ้นบนสุด">↑</button>
     <div class="rm-foot">
+      <button type="button" class="rm-print" id="stuPrintAllBtn" style="display:none">🖨 ปริ้นรายชื่อทั้งหมด</button>
+      <button type="button" class="rm-print alt" id="stuPrintFilteredBtn" style="display:none">🖨 ปริ้นตามที่กรอง</button>
       <button type="button" class="rm-csv" id="cardCsvBtn">📥 ดาวน์โหลด CSV</button>
       <button type="button" class="rm-close" id="cardCloseBtn">ปิด</button>
     </div>
@@ -1136,6 +1169,10 @@
   function openCardModal(type){
     var cfg=buildCardData(type, applySort(applyFilters()));
     cardCurrent=cfg;
+    // ปุ่มปริ้นบัญชีรายชื่อ — แสดงเฉพาะการ์ดรายชื่อนักเรียน
+    var _pa=document.getElementById('stuPrintAllBtn'), _pf=document.getElementById('stuPrintFilteredBtn');
+    if(_pa) _pa.style.display=cfg.studentMode?'':'none';
+    if(_pf) _pf.style.display=cfg.studentMode?'':'none';
     document.getElementById('cardModalTitle').textContent=cfg.title;
     var _sc=document.querySelector('#cardModal .rm-scroll'); if(_sc) _sc.scrollTop=0;  // เปิดการ์ดใหม่ = เริ่มบนสุดเสมอ
     var _tb=document.getElementById('cardTopBtn'); if(_tb) _tb.classList.remove('show');
@@ -1338,6 +1375,7 @@
       return true;
     });
     groups=applySortState(groups, STU_COLS, studentSort);
+    cardCurrent.lastGroups=groups; cardCurrent.lastRecs=recs;   // เก็บไว้ให้ปุ่ม "ปริ้นตามที่กรอง"
     // CSV ตามที่กรอง (เฉพาะนักเรียนที่เหลือ)
     var keep={}; groups.forEach(function(g){ keep[g.main[1]+'|'+g.main[2]]=1; });
     cardCurrent.csv={ headers:cfg.csvHeaders, rows:built.csvRows.filter(function(row){ return keep[row[1]+'|'+row[2]]; }) };
@@ -1744,6 +1782,118 @@
   document.getElementById('closePdfBtn').addEventListener('click', closePdf);
   // หน้า PDF ปิดได้เฉพาะปุ่ม "ปิด" เท่านั้น — กดพื้นที่ว่างรอบๆ ไม่ปิด (กันปิดพลาดตอนกำลังดู/พิมพ์)
   document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
+
+  // ===================================================================
+  // เอกสาร "บัญชีรายชื่อนักเรียนที่มีเวลาเรียนไม่ถึงร้อยละ 70" (รวมทุกวิชา/ครู จัดกลุ่มตามระดับชั้น)
+  // ปริ้นแยกจากใบรายงานครูเดี่ยว — ใช้ printArea + pdfModal + window.print ชุดเดิม
+  // ===================================================================
+  function _todayISO(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+  // สรุปเงื่อนไขตัวกรองที่ใช้อยู่ในการ์ด → ข้อความกำกับใต้ชื่อเอกสาร (เฉพาะตอน "ปริ้นตามที่กรอง")
+  function buildStuFilterDesc(){
+    var gv=function(id){ var el=document.getElementById(id); return el?el.value:''; };
+    var g=gv('stuGrade'), rm=gv('stuRoom'), pf=gv('stuPrefix'), pc=gv('stuPct'), cd=gv('stuCode'), rk=gv('stuRemark'), q=gv('stuQ');
+    var seg=[];   // วลีบรรยายขอบเขต (ขยายคำย่อให้เป็นทางการ)
+    if(g && rm) seg.push('ห้องมัธยมศึกษาปีที่ '+g+'/'+rm);
+    else if(g) seg.push('ระดับชั้นมัธยมศึกษาปีที่ '+g);
+    if(pf) seg.push('คำนำหน้า '+pf);
+    if(cd){ var sel=document.getElementById('stuCode'); var lbl=(sel&&sel.selectedOptions&&sel.selectedOptions[0])?sel.selectedOptions[0].textContent:cd; seg.push('รายวิชา '+lbl); }
+    if(rk) seg.push('หมายเหตุ '+(rk==='__other__'?'อื่น ๆ':rk));
+    if(q) seg.push('ชื่อมีคำว่า “'+q+'”');
+    var tail=[];   // เงื่อนไข % เข้าเรียน เชื่อมท้ายด้วย "ซึ่งมีเวลาเรียน..."
+    if(pc){ var mp={'0-49':'น้อยกว่าร้อยละ 50','50-59':'ระหว่างร้อยละ 50 ถึง 59','60-69':'ระหว่างร้อยละ 60 ถึง 69','70+':'ตั้งแต่ร้อยละ 70 ขึ้นไป'}; tail.push('มีเวลาเรียน'+(mp[pc]||pc)); }
+    if(!seg.length && !tail.length) return '';
+    var s='คัดกรองเฉพาะนักเรียน';
+    if(seg.length) s+=seg.join(' ');
+    if(tail.length) s+=(seg.length?' ซึ่ง':'ที่')+tail.join(' และ');
+    return s;
+  }
+  // สร้าง HTML เอกสาร — groups จาก buildStudentGroups, meta={sems,years,filterDesc,count}
+  function buildStudentListDoc(groups, meta){
+    meta=meta||{};
+    // จัดกลุ่มตามระดับชั้น (level จาก ชั้น/ห้อง = main[2])
+    var byLevel={}, levels=[];
+    groups.forEach(function(g){
+      var lv=parseClass(g.main[2]).level||'อื่นๆ';
+      if(!byLevel[lv]){ byLevel[lv]=[]; levels.push(lv); }
+      byLevel[lv].push(g);
+    });
+    levels.sort(function(a,b){ var na=parseInt(a,10), nb=parseInt(b,10); if(isNaN(na)&&isNaN(nb)) return 0; if(isNaN(na)) return 1; if(isNaN(nb)) return -1; return na-nb; });
+    // ในแต่ละชั้น เรียงห้อง→เลขที่→ชื่อ (มาตรฐานเอกสาร ไม่อิงการเรียงในตาราง)
+    levels.forEach(function(lv){
+      byLevel[lv].sort(function(a,b){
+        var ra=+parseClass(a.main[2]).room, rb=+parseClass(b.main[2]).room; ra=isNaN(ra)?9999:ra; rb=isNaN(rb)?9999:rb; if(ra!==rb) return ra-rb;
+        var sa=+a.main[0], sb=+b.main[0]; sa=isNaN(sa)?9999:sa; sb=isNaN(sb)?9999:sb; if(sa!==sb) return sa-sb;
+        return String(a.main[1]).localeCompare(String(b.main[1]),'th');
+      });
+    });
+    var html=''+
+      '<div class="sl-head">'+
+        '<div class="sl-school">โรงเรียนชานุมานวิทยาคม</div>'+
+        '<img src="logo.png" alt="โลโก้" onerror="this.style.display=\'none\';">'+
+        '<div class="sl-title">บัญชีรายชื่อนักเรียนที่มีเวลาเรียนไม่ถึงร้อยละ '+THRESHOLD+'</div>'+
+      '</div>';
+    var sems=meta.sems||[], years=meta.years||[], semTxt='';
+    if(sems.length===1 && years.length===1) semTxt='ภาคเรียนที่ '+sems[0]+' ปีการศึกษา '+years[0];
+    else if(years.length===1) semTxt='ปีการศึกษา '+years[0];
+    if(semTxt) html+='<div class="sl-meta">'+esc(semTxt)+'</div>';
+    if(meta.filterDesc) html+='<div class="sl-meta sl-cond">'+esc(meta.filterDesc)+'</div>';
+    html+='<div class="sl-asof">ข้อมูล ณ '+thaiDate(_todayISO())+' &nbsp; รวมทั้งสิ้น '+(meta.count||groups.length)+' คน</div>';
+    if(!groups.length){ html+='<div class="sl-empty">— ไม่มีรายชื่อนักเรียนตามเงื่อนไข —</div>'; return html; }
+
+    var colg='<colgroup><col style="width:5%"><col style="width:21%"><col style="width:24%"><col style="width:9%"><col style="width:9%"><col style="width:9%"><col style="width:10%"><col style="width:13%"></colgroup>';
+    levels.forEach(function(lv){
+      var list=byLevel[lv];
+      html+='<div class="sl-grade">ระดับชั้น '+(lv==='อื่นๆ'?'ไม่ระบุ':'ม.'+esc(lv))+' &nbsp;(รวม '+list.length+' คน)</div>';
+      html+='<table class="sl-table">'+colg+'<tbody>';
+      list.forEach(function(g,gi){
+        var fullName=(g.prefix||'')+g.main[1];
+        var pctRvm=(g.opNum==null)?'–':(g.main[4]||'–');
+        html+='<tr class="sl-stu">'+
+          '<td>'+(gi+1)+'</td>'+
+          '<td class="sl-name" colspan="2">'+esc(fullName)+'</td>'+
+          '<td>'+esc(g.main[2])+'</td>'+
+          '<td>เลขที่ '+esc(g.main[0])+'</td>'+
+          '<td colspan="2">ขาดเรียน '+g.sub.length+' วิชา</td>'+
+          '<td><span class="sl-lbl">% เข้าเรียน(รวม)</span>'+esc(pctRvm)+(pctRvm==='–'?'':' %')+'</td>'+
+        '</tr>'+
+        '<tr class="sl-subhead"><th></th><th>รายวิชา (รหัส)</th><th>ครูผู้สอน</th><th>คาบทั้งหมด</th><th>มาเรียน</th><th>ขาดเรียน</th><th>% เข้าเรียน</th><th>หมายเหตุ</th></tr>';
+        g.sub.forEach(function(s){
+          var long=(String(s[6]||'').indexOf('ขาดเรียนนาน')>=0);
+          html+='<tr class="sl-sub">'+
+            '<td></td>'+
+            '<td class="sl-subj">'+esc(s[0])+'</td>'+
+            '<td class="sl-tea">'+esc(s[1]||'')+'</td>'+
+            '<td>'+esc(s[2]||'')+'</td>'+
+            '<td>'+esc(s[3]||'')+'</td>'+
+            '<td>'+esc(s[4]||'')+'</td>'+
+            '<td>'+esc(s[5]||'')+'</td>'+
+            '<td'+(long?' class="sl-long"':'')+'>'+esc(s[6]||'')+'</td>'+
+          '</tr>';
+        });
+      });
+      html+='</tbody></table>';
+    });
+    return html;
+  }
+  // เปิดเอกสารปริ้น mode='all' (ทุกคน) | 'filtered' (เฉพาะที่กรองในตารางตอนนี้)
+  function openStudentListPdf(mode){
+    if(!cardCurrent || !cardCurrent.studentMode) return;
+    var recs, groups;
+    if(mode==='filtered'){ recs=(cardCurrent.lastRecs||[]).slice(); groups=(cardCurrent.lastGroups||[]).slice(); }
+    else { recs=(cardCurrent.rawRows||[]).slice(); groups=buildStudentGroups(recs).groups; }
+    if(!groups.length){ showToast('ไม่มีรายชื่อให้ปริ้น'); return; }
+    var sems=uniq(recs.map(function(r){ return r[COL.sem]; }).filter(Boolean));
+    var years=uniq(recs.map(function(r){ return r[COL.year]; }).filter(Boolean));
+    var fd=(mode==='filtered')?buildStuFilterDesc():'';
+    if(!fd) fd='รวมรายชื่อนักเรียนทุกระดับชั้นทั้งโรงเรียน';   // ทั้งหมด/ไม่ได้กรอง → บอกขอบเขตให้สม่ำเสมอกับตอนกรอง
+    printArea.innerHTML=buildStudentListDoc(groups, { sems:sems, years:years, filterDesc:fd, count:groups.length });
+    pdfModal.classList.add('show'); document.body.style.overflow='hidden';
+  }
+  (function(){
+    var ba=document.getElementById('stuPrintAllBtn'), bf=document.getElementById('stuPrintFilteredBtn');
+    if(ba) ba.addEventListener('click', function(){ openStudentListPdf('all'); });
+    if(bf) bf.addEventListener('click', function(){ openStudentListPdf('filtered'); });
+  })();
 </script>
 </body>
 </html>
