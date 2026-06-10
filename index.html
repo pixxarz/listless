@@ -284,8 +284,6 @@
       box-shadow: 0 6px 18px rgba(0,0,0,.25); display: inline-flex; align-items: center; gap: 8px;
     }
     .float-print { left: 28px; background: linear-gradient(135deg,#10b981,#059669); color: #fff; }
-    .float-save { position: fixed; top: 22px; left: 150px; border: none; border-radius: 28px; padding: 12px 24px; font-family: 'Sarabun', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; z-index: 95; box-shadow: 0 6px 18px rgba(0,0,0,.25); display: inline-flex; align-items: center; gap: 8px; color: #fff; background: linear-gradient(135deg,#6366f1,#4f46e5); }
-    .float-save:hover { filter: brightness(1.08); }
     .float-close { right: 28px; background: linear-gradient(135deg,#f87171,#ef4444); color: #fff; }
     .print-hint {
       position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
@@ -343,7 +341,7 @@
       body { background: #fff !important; padding: 0 !important; }
       /* ซ่อนทุกอย่างยกเว้นเอกสาร — ใช้ display:none ให้เนื้อหาไหลข้ามหน้าได้ */
       .page-wrap, .admin-link, .toast { display: none !important; }
-      .float-print, .float-save, .float-close, .print-hint { display: none !important; }
+      .float-print, .float-close, .print-hint { display: none !important; }
       .pdf-backdrop {
         position: static !important; display: block !important; background: none !important;
         padding: 0 !important; overflow: visible !important;
@@ -367,7 +365,6 @@
       .doc-paper { padding: 10mm 8mm; }
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.3/dist/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 <div class="page-wrap">
@@ -514,9 +511,8 @@
 
 <!-- PDF Modal -->
 <div class="pdf-backdrop" id="pdfModal">
-  <button type="button" class="float-print no-print" id="printBtn">🖨 พิมพ์</button>
-  <button type="button" class="float-save no-print" id="savePdfBtn">📥 บันทึก PDF</button>
-  <div class="print-hint no-print">"พิมพ์" = เปิดหน้าต่างพิมพ์ (เลือก A4 + เอาหัว/ท้ายกระดาษออก) · "บันทึก PDF" = ดาวน์โหลดไฟล์ทันที</div>
+  <button type="button" class="float-print no-print" id="printBtn">🖨 พิมพ์ / บันทึก PDF</button>
+  <div class="print-hint no-print">กดปุ่มแล้วเลือกกระดาษ A4 + เอาหัว/ท้ายกระดาษออก · จะพิมพ์ลงกระดาษ หรือเลือกเครื่องพิมพ์เป็น "บันทึกเป็น PDF" เพื่อโหลดไฟล์ก็ได้</div>
   <button type="button" class="float-close no-print" id="closePdfBtn">ปิด</button>
   <div class="doc-paper" id="printArea"></div>
 </div>
@@ -1211,14 +1207,6 @@
   document.getElementById('closePdfBtn').addEventListener('click', closePdf);
   // หน้า PDF ปิดได้เฉพาะปุ่ม "ปิด" เท่านั้น — กดพื้นที่ว่างรอบๆ ไม่ปิด (กันปิดพลาดตอนกำลังดู/พิมพ์)
   document.getElementById('printBtn').addEventListener('click', function(){ window.print(); });
-  // บันทึก PDF ตรงๆ ด้วย html2pdf (ถ้า lib โหลดไม่ได้ → fallback หน้าต่างพิมพ์)
-  document.getElementById('savePdfBtn').addEventListener('click', function(){
-    var el=document.getElementById('printArea');
-    if(typeof html2pdf==='undefined'){ window.print(); return; }
-    var btn=this, old=btn.textContent; btn.disabled=true; btn.textContent='⏳ กำลังบันทึก...';
-    var done=function(){ btn.disabled=false; btn.textContent=old; };
-    html2pdf().set({ margin:0, filename:'รายงานนักเรียน_'+new Date().toISOString().slice(0,10)+'.pdf', image:{type:'jpeg',quality:0.98}, html2canvas:{scale:3, useCORS:true, letterRendering:true, backgroundColor:'#ffffff'}, jsPDF:{unit:'mm', format:'a4', orientation:'portrait'} }).from(el).save().then(done).catch(done);
-  });
 
   // ===== Export CSV (ข้อมูลที่กรอกในฟอร์มตอนนี้) =====
   document.getElementById('exportCsvBtn').addEventListener('click', function(){
