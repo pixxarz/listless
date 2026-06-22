@@ -344,6 +344,8 @@
 
     @media print {
       body { background: #fff !important; padding: 0 !important; }
+      /* บังคับพิมพ์สีพื้นหลัง (แถบสีหัวตาราง) ไม่ให้เบราว์เซอร์ตัดทิ้งตอนพิมพ์ */
+      .doc-paper, .doc-paper * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       /* ซ่อนทุกอย่างยกเว้นเอกสาร — ใช้ display:none ให้เนื้อหาไหลข้ามหน้าได้ */
       .page-wrap, .admin-link, .toast { display: none !important; }
       .float-print, .float-close, .print-hint { display: none !important; }
@@ -362,6 +364,7 @@
       @page { size: A4 portrait; margin: 14mm; }
     }
     @media (max-width: 720px) {
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }   /* มือถือ: ตารางกรอกเลื่อนในกรอบ ไม่ล้นจอ */
       .card { padding: 20px 16px; }
       .doc-header { grid-template-columns: 70px 1fr; padding: 16px; }
       .school-info { grid-column: 1 / -1; text-align: left; margin-top: 6px; }

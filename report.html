@@ -310,6 +310,8 @@
 
     @media print{
       body{ background:#fff !important; padding:0 !important; }
+      /* บังคับพิมพ์สีพื้นหลัง (แถบสีหัวตาราง/แถวนักเรียน/หัวชั้น) ไม่ให้เบราว์เซอร์ตัดทิ้งตอนพิมพ์ */
+      .doc-paper, .doc-paper *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
       .wrap,.float-print,.float-close,.print-hint,.rm-backdrop{ display:none !important; }
       .pdf-backdrop{ position:static !important; display:block !important; background:none !important; padding:0 !important; overflow:visible !important; }
       .doc-paper{ position:static !important; box-shadow:none !important; border-radius:0 !important; width:100% !important; max-width:none !important; min-height:0 !important; padding:0 !important; }
