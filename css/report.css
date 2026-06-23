@@ -1,0 +1,318 @@
+    /* ฟอนต์ราชการ TH Sarabun New ฝังในเว็บ (host เอง) — ทุกเครื่องเห็นเอกสารเหมือนกัน ไม่ต้องติดตั้งฟอนต์ */
+    @font-face{ font-family:'TH Sarabun New'; src:url('../fonts/THSarabunNew.woff2') format('woff2'); font-weight:400; font-style:normal; font-display:swap; }
+    @font-face{ font-family:'TH Sarabun New'; src:url('../fonts/THSarabunNew-Bold.woff2') format('woff2'); font-weight:700; font-style:normal; font-display:swap; }
+    @font-face{ font-family:'TH Sarabun New'; src:url('../fonts/THSarabunNew-Italic.woff2') format('woff2'); font-weight:400; font-style:italic; font-display:swap; }
+    @font-face{ font-family:'TH Sarabun New'; src:url('../fonts/THSarabunNew-BoldItalic.woff2') format('woff2'); font-weight:700; font-style:italic; font-display:swap; }
+    :root{
+      --purple:#7c3aed; --purple-dark:#6d28d9; --purple-table:#6b21a8;
+      --pink:#db2777; --green:#059669; --green-dark:#047857;
+      --red:#dc2626; --amber:#d97706;
+      --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb; --field-bg:#fff;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; font-family:'Sarabun',system-ui,sans-serif; color:var(--ink);
+      background:linear-gradient(135deg,#f5f3ff 0%,#fdf2f8 100%); min-height:100vh; padding:20px;
+    }
+    .wrap{ max-width:1400px; margin:0 auto; }
+
+    /* ===== Header ===== */
+    .topbar{
+      background:#fff; border-radius:18px; padding:16px 22px; box-shadow:0 8px 24px rgba(124,58,237,.08);
+      display:flex; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:18px;
+    }
+    .topbar img{ height:52px; width:auto; }
+    .topbar .titles{ flex:1; min-width:200px; }
+    .topbar h1{ margin:0; font-family:'Prompt','Sarabun',sans-serif; font-size:20px; color:var(--purple-dark); }
+    .topbar .sub{ font-size:13px; color:var(--muted); margin-top:2px; }
+    .topbar .acts{ display:flex; gap:10px; flex-wrap:wrap; }
+    .btn{ border:none; border-radius:22px; padding:10px 18px; font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; color:#fff; display:inline-flex; align-items:center; gap:7px; text-decoration:none; transition:transform .12s; }
+    .btn:hover{ transform:translateY(-1px); }
+    .btn-home{ background:linear-gradient(135deg,#6366f1,#4f46e5); }   /* ครามเดียวกับปุ่มกรอกฟอร์มใหม่ในหน้ากรอก */
+    .btn-out{ background:linear-gradient(135deg,#f87171,#ef4444); }
+    /* ปุ่ม CSV ในแถบกรอง (2 แบบ: ทั้งหมด / ตามตัวกรอง) */
+    .filters-meta .btn-csv2{ background:linear-gradient(135deg,#10b981,#059669); color:#fff; border:none; border-radius:22px; padding:9px 16px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .filters-meta .btn-csv2:hover{ filter:brightness(1.08); }
+    .btn-ghost{ background:#f3f4f6; color:#4b5563; }
+    .btn-clear{ background:#f5f3ff; color:#6d28d9; border:1.5px solid var(--purple); }
+    .btn-clear:hover{ background:var(--purple); color:#fff; }
+    .btn-clear .cx{ font-size:13px; font-weight:700; }
+
+    /* ===== KPI cards ===== */
+    .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px; margin-bottom:18px; }
+    .kpi{ background:#fff; border-radius:16px; padding:16px 18px; box-shadow:0 6px 18px rgba(0,0,0,.05); border:1.5px solid var(--purple); border-left-width:5px; }
+    .kpi.green{ border-color:var(--green); } .kpi.amber{ border-color:var(--amber); }
+    .kpi.red{ border-color:var(--red); } .kpi.pink{ border-color:var(--pink); } .kpi.blue{ border-color:#2563eb; }
+    .kpi .label{ font-size:13px; color:var(--muted); margin-bottom:6px; }
+    .kpi .value{ font-size:30px; font-weight:700; font-family:'Prompt','Sarabun',sans-serif; line-height:1; }
+    .kpi .unit{ font-size:13px; color:var(--muted); font-weight:400; margin-left:4px; }
+    .kpi-click{ cursor:pointer; transition:transform .12s, box-shadow .15s; }
+    .kpi-click:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(37,99,235,.18); }
+    /* Modal รายการใบรายงาน */
+    .rm-backdrop{ position:fixed; inset:0; background:rgba(17,24,39,.55); display:none; align-items:center; justify-content:center; z-index:250; padding:20px; }
+    .rm-backdrop.show{ display:flex; }
+    .rm-box{ background:#fff; border-radius:18px; max-width:1100px; width:96vw; height:88vh; max-height:88vh; display:flex; flex-direction:column; padding:24px; box-shadow:0 18px 50px rgba(0,0,0,.3); position:relative; }
+    /* ปุ่มกดขึ้นบนสุดในป๊อปอัป — มุมขวาล่าง โปร่งแสง โผล่เฉพาะเมื่อเลื่อนลง ไม่บังเนื้อหา */
+    .card-top-btn{ position:absolute; right:20px; bottom:78px; width:42px; height:42px; border-radius:50%; background:rgba(124,58,237,.85); color:#fff; border:none; font-size:22px; line-height:1; cursor:pointer; display:none; align-items:center; justify-content:center; box-shadow:0 4px 14px rgba(76,29,149,.35); z-index:15; transition:background .15s, transform .12s; }
+    .card-top-btn.show{ display:flex; }
+    .card-top-btn:hover{ background:var(--purple); transform:translateY(-2px); }
+    /* ปุ่มขึ้นบนสุดของหน้ารายงานหลัก (เลื่อนทั้งหน้า) */
+    .main-top-btn{ position:fixed; right:24px; bottom:24px; width:48px; height:48px; border-radius:50%; background:rgba(124,58,237,.9); color:#fff; border:none; font-size:24px; line-height:1; cursor:pointer; display:none; align-items:center; justify-content:center; box-shadow:0 6px 18px rgba(76,29,149,.4); z-index:80; transition:background .15s, transform .12s; }
+    .main-top-btn.show{ display:flex; }
+    .main-top-btn:hover{ background:var(--purple); transform:translateY(-3px); }
+    /* การ์ดรายชื่อนักเรียน — ขยายใหญ่เท่าหน้าเว็บพื้นหลัง (1400px) เพราะข้อมูล/ตัวกรองเยอะ */
+    .rm-box.rm-wide{ max-width:1400px; width:96vw; height:92vh; max-height:92vh; }   /* สูงคงที่เต็มจอ ไม่ขยาย-หดตามจำนวนข้อมูล + ปรับตามจอ (vh) รองรับทุกความละเอียด */
+    .rm-box h3{ margin:0 0 14px; font-family:'Prompt','Sarabun',sans-serif; font-size:18px; color:var(--purple-dark); text-align:center; }
+    .rm-scroll{ overflow:auto; flex:1; border:1px solid var(--line); border-radius:10px; scrollbar-gutter:stable; overscroll-behavior:contain; }
+    .rm-table{ width:100%; border-collapse:collapse; font-size:14px; }
+    .rm-table th{ background:var(--purple-table); color:#fff; padding:10px 8px; position:sticky; top:0; z-index:5; white-space:nowrap; font-weight:600; text-align:left; background-clip:padding-box; }
+    .rm-table thead th:first-child{ border-top-left-radius:10px; }
+    .rm-table thead th:last-child{ border-top-right-radius:10px; }
+    .rm-table td{ padding:9px 8px; border-bottom:1px solid var(--line); }
+    .rm-table tr:nth-child(even) td{ background:#faf9fe; }
+    /* ตารางแบบกดขยาย (การ์ดรายชื่อนักเรียน) — 1 แถวต่อคน กดเปิดดูรายวิชา/ครู */
+    .rm-table.rm-exp{ table-layout:fixed; }   /* ล็อกความกว้างคอลัมน์ → กดขยายแถวย่อยแล้วคอลัมน์หลักไม่บีบ/ขยับ */
+    .rm-exp .exp-toggle{ width:34px; }
+    .rm-exp tr:nth-child(even) td{ background:transparent; }
+    .rm-exp .exp-main td{ background:#fff; border-top:2px solid #efe9ff; cursor:pointer; }
+    .rm-exp .exp-main:hover td{ background:#ede9fe; }
+    .rm-exp .exp-main.open td{ background:#f5f3ff; }
+    /* ชี้แถวชื่อ → ป้ายบอกว่ากดดูรายวิชาได้ */
+    .rm-exp .exp-main td:nth-child(2){ position:relative; }
+    .rm-exp .exp-main:hover td:nth-child(2)::after{ content:attr(data-tip); position:absolute; left:0; top:100%; margin-top:3px; background:#4c1d95; color:#fff; font-size:11px; font-weight:500; padding:4px 9px; border-radius:6px; white-space:nowrap; z-index:9; pointer-events:none; box-shadow:0 6px 16px rgba(76,29,149,.3); }
+    .exp-toggle{ text-align:center; color:var(--purple); font-weight:700; width:34px; }
+    .exp-arrow{ font-size:11px; display:inline-block; }
+    .exp-sub>td{ padding:0 8px 10px !important; background:#fff !important; }
+    .rm-subtable{ width:100%; table-layout:fixed; border-collapse:collapse; background:#faf9ff; border:1px solid #ece6ff; border-radius:8px; overflow:hidden; }
+    .rm-subtable th{ background:#ede9fe; color:var(--purple-dark); font-size:12px; font-weight:600; padding:6px 9px; text-align:left; white-space:nowrap; position:static; }
+    .rm-subtable td{ padding:6px 9px; font-size:13px; border-bottom:1px solid #f0ebff; line-height:1.6; background:transparent; }
+    .rm-subtable tr:last-child td{ border-bottom:none; }
+    /* ล็อกความกว้างคอลัมน์ตารางย่อย — ชื่อยาวตัดขึ้นบรรทัดใหม่ ไม่ดันคอลัมน์อื่นเพี้ยน */
+    /* ตารางย่อยการ์ดนักเรียน (วิชา/ครู/คาบ/มา/ขาด/%/หมายเหตุ) */
+    .rm-sub-stu th:nth-child(1),.rm-sub-stu td:nth-child(1){ width:26%; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+    .rm-sub-stu th:nth-child(2),.rm-sub-stu td:nth-child(2){ width:28%; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+    .rm-sub-stu th:nth-child(3),.rm-sub-stu td:nth-child(3),
+    .rm-sub-stu th:nth-child(4),.rm-sub-stu td:nth-child(4),
+    .rm-sub-stu th:nth-child(5),.rm-sub-stu td:nth-child(5){ width:8%; }
+    .rm-sub-stu th:nth-child(6),.rm-sub-stu td:nth-child(6){ width:11%; }
+    .rm-sub-stu th:nth-child(7),.rm-sub-stu td:nth-child(7){ width:11%; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+    /* ตารางย่อยการ์ดใบรายงาน (เลขที่/ชื่อ/ห้อง/คาบ/มา/ขาด/%/หมายเหตุ) */
+    .rm-sub-rep th:nth-child(1),.rm-sub-rep td:nth-child(1){ width:7%; }
+    .rm-sub-rep th:nth-child(2),.rm-sub-rep td:nth-child(2){ width:27%; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+    .rm-sub-rep th:nth-child(3),.rm-sub-rep td:nth-child(3){ width:13%; }
+    .rm-sub-rep th:nth-child(4),.rm-sub-rep td:nth-child(4),
+    .rm-sub-rep th:nth-child(5),.rm-sub-rep td:nth-child(5),
+    .rm-sub-rep th:nth-child(6),.rm-sub-rep td:nth-child(6){ width:8%; }
+    .rm-sub-rep th:nth-child(7),.rm-sub-rep td:nth-child(7){ width:10%; }
+    .rm-sub-rep th:nth-child(8),.rm-sub-rep td:nth-child(8){ width:19%; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+    /* ตารางย่อยการ์ดครู (วันที่/วิชา/จำนวนนักเรียน/% เฉลี่ย/เอกสาร) */
+    .rm-sub-tea th:nth-child(1),.rm-sub-tea td:nth-child(1){ width:16%; }
+    .rm-sub-tea th:nth-child(2),.rm-sub-tea td:nth-child(2){ width:38%; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+    .rm-sub-tea th:nth-child(3),.rm-sub-tea td:nth-child(3){ width:15%; }
+    .rm-sub-tea th:nth-child(4),.rm-sub-tea td:nth-child(4){ width:15%; }
+    .rm-sub-tea th:nth-child(5),.rm-sub-tea td:nth-child(5){ width:16%; }
+    /* จัดคอลัมน์ตัวเลขให้อยู่กึ่งกลาง (อ่านง่าย เป็นระเบียบ) */
+    .rm-exp th.num,.rm-exp td.num{ text-align:center; }
+    .rm-sub-rep th:nth-child(1),.rm-sub-rep td:nth-child(1),.rm-sub-rep th:nth-child(4),.rm-sub-rep td:nth-child(4),.rm-sub-rep th:nth-child(5),.rm-sub-rep td:nth-child(5),.rm-sub-rep th:nth-child(6),.rm-sub-rep td:nth-child(6),.rm-sub-rep th:nth-child(7),.rm-sub-rep td:nth-child(7){ text-align:center; }
+    .rm-sub-stu th:nth-child(3),.rm-sub-stu td:nth-child(3),.rm-sub-stu th:nth-child(4),.rm-sub-stu td:nth-child(4),.rm-sub-stu th:nth-child(5),.rm-sub-stu td:nth-child(5),.rm-sub-stu th:nth-child(6),.rm-sub-stu td:nth-child(6){ text-align:center; }
+    .rm-sub-tea th:nth-child(3),.rm-sub-tea td:nth-child(3),.rm-sub-tea th:nth-child(4),.rm-sub-tea td:nth-child(4),.rm-sub-tea th:nth-child(5),.rm-sub-tea td:nth-child(5){ text-align:center; }
+    /* ตารางย่อยการ์ดวิชา (ชื่อ/ห้อง/คาบ/มา/ขาด/%/หมายเหตุ) */
+    .rm-sub-subj th:nth-child(1),.rm-sub-subj td:nth-child(1){ width:28%; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+    .rm-sub-subj th:nth-child(2),.rm-sub-subj td:nth-child(2){ width:13%; }
+    .rm-sub-subj th:nth-child(3),.rm-sub-subj td:nth-child(3),.rm-sub-subj th:nth-child(4),.rm-sub-subj td:nth-child(4),.rm-sub-subj th:nth-child(5),.rm-sub-subj td:nth-child(5){ width:9%; text-align:center; }
+    .rm-sub-subj th:nth-child(6),.rm-sub-subj td:nth-child(6){ width:11%; text-align:center; }
+    .rm-sub-subj th:nth-child(7),.rm-sub-subj td:nth-child(7){ width:21%; white-space:normal; overflow-wrap:anywhere; word-break:break-word; }
+    /* หัวคอลัมน์ที่คลิกเรียงได้ (การ์ดใบรายงาน) */
+    .rm-exp th.rsortable{ cursor:pointer; user-select:none; }   /* ไม่ตั้ง position — ใช้ sticky จาก .rm-table th (หัวตารางป๊อปอัปตรึงเวลาเลื่อน) */
+    .rm-exp th.rsortable:hover{ background:#581c87; }
+    .rm-exp th.rsortable .rarr{ font-size:15px; margin-left:5px; opacity:.75; }   /* ⇅ = เรียงได้ */
+    .rm-exp th.rsortable .rarr.on{ opacity:1; font-size:13px; }                    /* ▲▼ เข้ม = กำลังเรียงคอลัมน์นี้ */
+    .rm-exp th.rsortable .rpin{ font-size:11px; margin-left:4px; opacity:.3; cursor:pointer; display:inline-block; transition:opacity .15s, transform .12s; }  /* 📌 จาง = กดเพื่อตรึง */
+    .rm-exp th.rsortable .rpin:hover{ opacity:.9; transform:scale(1.2); }
+    .rm-exp th.rsortable .rpin.on{ opacity:1; }   /* ตรึงอยู่ = เต็ม + มีเลขลำดับ */
+    .rm-exp th.rsortable.pinned{ background:linear-gradient(135deg,#f0ad4e,#dd9320)!important; }   /* คอลัมที่ตรึง = พื้นอำพันจาง */
+    .pinno{ font-size:9px; font-weight:700; vertical-align:super; margin-left:1px; }   /* เลขลำดับการตรึง ยกเล็ก */
+    .rm-table td.pcol, table.data tbody td.pcol{ background:rgba(240,173,78,.18)!important; }   /* เซลล์ในคอลัมที่ตรึง = อำพันจาง */
+    .rm-exp th.rsortable:hover::after{ content:'กดเพื่อเรียงลำดับ'; position:absolute; left:50%; top:100%; transform:translateX(-50%); margin-top:4px; background:#4c1d95; color:#fff; font-size:11px; font-weight:500; padding:4px 9px; border-radius:6px; white-space:nowrap; z-index:9; pointer-events:none; box-shadow:0 6px 16px rgba(76,29,149,.3); }
+    /* แถบตัวกรองในป๊อปอัปรายชื่อนักเรียน (เสมือนหน้าเพจย่อย) */
+    .stu-filter{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; padding:6px 0 14px; border-bottom:1px solid #f0e9ff; position:sticky; top:0; z-index:8; background:#fff; }
+    .stu-filter .fld{ display:flex; flex-direction:column; gap:4px; }
+    .stu-filter .stu-clear{ align-self:flex-end; background:#f5f3ff; color:#6d28d9; border:1.5px solid var(--purple); border-radius:9px; padding:8px 14px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .stu-filter .stu-clear:hover{ background:var(--purple); color:#fff; }
+    .rm-table.rm-exp thead th{ top:var(--popfh,0); }   /* หัวตารางตรึงใต้แถบกรอง (sticky) ในป๊อปอัป */
+    .stu-filter .fld.grow{ flex:1; min-width:180px; }
+    .stu-filter label{ font-size:12px; color:var(--muted); }
+    .stu-filter input,.stu-filter select{ border:1px solid #d1d5db; border-radius:9px; padding:8px 11px; font-family:inherit; font-size:13px; background:#fff; outline:none; }
+    .stu-filter input:focus,.stu-filter select:focus{ border-color:var(--purple); box-shadow:0 0 0 3px rgba(124,58,237,.12); }
+    .stu-count{ font-size:13px; color:var(--muted); margin-bottom:10px; }
+    .rm-foot{ display:flex; gap:12px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap; }
+    .rm-csv{ background:linear-gradient(135deg,#14b8a6,#0d9488); color:#fff; border:none; border-radius:22px; padding:10px 26px; font-family:inherit; font-size:15px; font-weight:600; cursor:pointer; }
+    .rm-csv:hover{ filter:brightness(1.08); }
+    /* ปุ่มปริ้นบัญชีรายชื่อ (เฉพาะการ์ดรายชื่อนักเรียน) — เขียว=ทั้งหมด, น้ำเงิน=ตามกรอง */
+    .rm-print{ background:linear-gradient(135deg,#fb7185,#e11d48); color:#fff; border:none; border-radius:22px; padding:10px 24px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 4px 14px rgba(225,29,72,.35); }   /* ปริ้นทั้งหมด = ชมพูแดงสด เด่นสุด */
+    .rm-print.alt{ background:#fde7ef; color:#be185d; border:1.5px solid #f6a5c0; font-weight:600; box-shadow:none; }   /* ปริ้นตามที่กรอง = ชมพูอ่อน รองลงมา */
+    .rm-print:hover{ filter:brightness(1.06); }
+    .rm-print.alt:hover{ background:#fbcfe0; filter:none; }
+    .rm-print:disabled{ opacity:.5; cursor:not-allowed; filter:none; }
+    .rm-close{ background:#f5f3ff; color:#6d28d9; border:1.5px solid var(--purple); border-radius:22px; padding:10px 32px; font-family:inherit; font-size:15px; font-weight:600; cursor:pointer; }
+    .rm-close:hover{ background:var(--purple); color:#fff; }
+
+    /* ===== Panels (chart + top risk) ===== */
+    .panels{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px; }
+    @media(max-width:860px){ .panels{ grid-template-columns:1fr; } }
+    .panel{ background:#fff; border:1px solid #e9d5ff; border-radius:16px; padding:18px 20px; box-shadow:0 6px 18px rgba(0,0,0,.05); }
+    /* แถวบน (ระดับชั้น/แจกแจง %) ข้อมูลคงที่อยู่แล้ว — ล็อกสูงพอดีเนื้อหา (ซ้าย-ขวาเท่ากัน) แต่เตี้ยกว่าแถวล่าง */
+    #gradeChart,#percentChart{ min-height:176px; display:flex; flex-direction:column; }
+    /* แถวล่าง (กลุ่มเสี่ยง/รายวิชา) ข้อมูลเปลี่ยนตามกรอง/ค้นหา — ล็อกสูงคงที่ กันหด/ขยายเด้งกระตุก */
+    #riskList,#subjectChart{ min-height:252px; display:flex; flex-direction:column; }
+    .panel h3{ margin:0 0 14px; font-size:15px; color:var(--purple-dark); font-family:'Prompt','Sarabun',sans-serif; }
+    .bar-row{ display:flex; align-items:center; gap:10px; margin-bottom:9px; font-size:14px; position:relative; }
+    /* ชี้แท่งกราฟ → ป้ายเล็กบอกค่า + เด้งนุ่ม + แท่งสว่างขึ้น */
+    /* ชี้แท่งกราฟ → แท่งบวมขึ้นนิดๆ + สว่างขึ้น (animation) */
+    .bar-row[data-tip]{ cursor:default; }
+    .bar-row[data-tip] .track{ transition:transform .15s cubic-bezier(.2,.9,.3,1.3); }
+    .bar-row[data-tip] .fill{ transition:width .4s, filter .15s; }
+    .bar-row[data-tip]:hover .track{ transform:scaleY(1.22); }
+    .bar-row[data-tip]:hover .fill{ filter:brightness(1.13) saturate(1.12); }
+    .bar-row[data-tip]:hover .num{ color:var(--purple-dark); font-weight:800; }
+    /* ป้ายลอยตามเมาส์ (ไม่ใช่กลางแถว) สีม่วง ไม่ใช่ดำ */
+    .chart-tip{ position:fixed; transform:translate(-50%,-130%); background:linear-gradient(135deg,#6d28d9,#7c3aed); color:#fff; font-size:12px; font-weight:600; padding:6px 12px; border-radius:9px; white-space:nowrap; z-index:60; pointer-events:none; box-shadow:0 8px 20px rgba(76,29,149,.4); opacity:0; transition:opacity .14s; }
+    .chart-tip.show{ opacity:1; }
+    .chart-tip::after{ content:''; position:absolute; left:50%; top:100%; transform:translateX(-50%); border:6px solid transparent; border-top-color:#7c3aed; }
+    .bar-row .lbl{ width:42px; color:var(--muted); flex-shrink:0; }
+    .bar-row .subj-lbl{ width:200px; flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.5; padding-block:1px; }   /* fix กว้างคงที่ → ทุกแท่งเริ่มตรงกัน เทียบง่าย (ชื่อยาวตัด ... ชี้เมาส์ดูเต็ม) */
+    .bar-row .track{ flex:1; background:#f3f4f6; border-radius:8px; height:20px; overflow:hidden; }
+    .bar-row .fill{ height:100%; background:linear-gradient(90deg,#a78bfa,#7c3aed); border-radius:8px; transition:width .4s, filter .15s; }
+    .bar-row .num{ width:36px; text-align:right; font-weight:600; flex-shrink:0; }
+    .risk-row{ display:flex; align-items:center; justify-content:space-between; padding:8px 6px; border-bottom:1px solid var(--line); font-size:14px; line-height:1.6; border-radius:8px; transition:background .15s; }
+    .risk-row:hover{ background:#faf5ff; }
+    .risk-row:last-child{ border-bottom:none; }
+    .risk-row .pct{ font-weight:700; color:var(--red); }
+    .empty-hint{ color:var(--muted); font-size:14px; text-align:center; padding:20px 0; }
+    .chart-more{ text-align:center; margin-top:auto; padding-top:10px; color:var(--purple); font-size:13px; font-weight:600; cursor:pointer; }
+    .chart-more:hover{ text-decoration:underline; }
+
+    /* ===== Filter bar ===== */
+    .filters{ background:#fff; border-radius:16px; padding:16px 18px; box-shadow:0 6px 18px rgba(0,0,0,.05); margin-bottom:16px; position:sticky; top:8px; z-index:30; }
+    /* แถวหัว: หัวข้อ (ซ้าย) + จำนวน/ปุ่มล้าง (ขวา) */
+    .filters .filters-head{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid #f0e9ff; }
+    .filters .filters-head h3{ margin:0; font-size:15px; color:var(--purple-dark); font-family:'Prompt','Sarabun',sans-serif; display:flex; align-items:center; gap:8px; }
+    .filters .filters-meta{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .filters .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; }
+    .filters label{ display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+    .filters input,.filters select{ width:100%; border:1px solid #d1d5db; border-radius:9px; padding:9px 11px; font-family:inherit; font-size:14px; background:#fff; outline:none; }
+    .filters input:focus,.filters select:focus{ border-color:var(--purple); box-shadow:0 0 0 3px rgba(124,58,237,.12); }
+    .filters .search-wrap{ grid-column:span 2; }   /* ค้นหากว้าง 2 ช่อง (เหลือที่ให้วันที่อยู่แถวเดียวกัน) */
+    .filters .count{ font-size:14px; color:var(--muted); }
+    .filters .count b{ color:var(--purple-dark); }
+
+    /* ===== Table ===== */
+    /* ไม่ใส่ overflow บน 2 ตัวนี้ — ให้หน้าเลื่อนทั้งหน้า (body) แล้วหัวตาราง sticky ติดใต้แถบกรองได้ */
+    .table-card{ background:#fff; border-radius:16px; box-shadow:0 6px 18px rgba(0,0,0,.05); }
+    .table-scroll{ overflow-x:visible; }
+    table.data{ width:100%; border-collapse:collapse; min-width:1040px; }
+    table.data thead th{ background:var(--purple-table); color:#fff; font-weight:600; font-size:13px; padding:12px 10px; text-align:left; white-space:nowrap; position:sticky; top:var(--fh,0); z-index:20; line-height:1.5; }
+    table.data thead th:first-child{ border-top-left-radius:12px; }
+    table.data thead th:last-child{ border-top-right-radius:12px; }
+    table.data tbody td{ padding:10px; border-bottom:1px solid var(--line); font-size:14px; line-height:1.6; }
+    table.data tbody tr.rpt-0 td{ background:#ffffff; }     /* ใบสลับสี: ขาว */
+    table.data tbody tr.rpt-1 td{ background:#f5f3ff; }     /* ใบสลับสี: ม่วงจางมาก */
+    table.data tbody tr.rpt-top td{ border-top:2px solid #c4b5fd; } /* เส้นคั่นระหว่างใบ */
+    table.data tbody tr:hover td{ background:#ede9fe; }     /* ชี้แถว = เน้น (ทับสีใบ) */
+    .pct-bad{ color:var(--red); font-weight:700; }
+    table.data thead th.sortable{ cursor:pointer; user-select:none; }   /* ไม่ตั้ง position — ใช้ sticky จาก thead th (sticky ก็เป็น positioned รองรับ tooltip ::after) */
+    table.data thead th.sortable:hover{ background:#581c87; }
+    table.data thead th .arr{ font-size:14px; margin-left:4px; opacity:.5; }     /* ⇅ = เรียงได้ */
+    table.data thead th .arr.on{ opacity:1; font-size:12px; }                     /* ▲▼ = กำลังเรียง */
+    table.data thead th .spin{ font-size:11px; margin-right:6px; opacity:.3; cursor:pointer; display:inline-block; transition:opacity .15s, transform .12s; }  /* 📌 จาง (ซ้ายหัวคอลัม) = กดเพื่อตรึง */
+    table.data thead th .spin:hover{ opacity:.9; transform:scale(1.2); }
+    table.data thead th .spin.on{ opacity:1; }   /* ตรึงอยู่ = เต็ม + เลขลำดับ */
+    table.data thead th.sortable.pinned{ background:linear-gradient(135deg,#f0ad4e,#dd9320)!important; }   /* คอลัมที่ตรึง = พื้นอำพันจาง */
+    table.data thead th.sortable:hover::after{ content:'กดเพื่อเรียงลำดับ'; position:absolute; left:50%; top:100%; transform:translateX(-50%); margin-top:4px; background:#4c1d95; color:#fff; font-size:11px; font-weight:500; padding:4px 9px; border-radius:6px; white-space:nowrap; z-index:9; pointer-events:none; box-shadow:0 6px 16px rgba(76,29,149,.3); }
+    .badge{ display:inline-block; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:600; white-space:nowrap; }
+    .badge-saved{ background:#d1fae5; color:#047857; }
+    .badge-long{ background:#fee2e2; color:#b91c1c; }
+    /* บีบคอลัมน์ตัวเลขให้แคบ (คาบ/มา/ขาด/%) → เหลือที่ให้คอลัมน์หมายเหตุ */
+    table.data th[data-key="periods"],table.data th[data-key="present"],table.data th[data-key="absent"]{ width:64px; }
+    table.data th[data-key="percent"],table.data th[data-key="seat"]{ width:72px; }
+    .btn-pdf-row{ background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; border:none; border-radius:8px; padding:6px 12px; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+    .btn-pdf-row:hover{ filter:brightness(1.08); }
+
+    /* ===== Loading / gate ===== */
+    .gate{ position:fixed; inset:0; background:linear-gradient(135deg,#7c3aed,#db2777); display:flex; align-items:center; justify-content:center; z-index:300; padding:20px; }
+    .gate-box{ background:#fff; border-radius:20px; padding:34px 30px; width:100%; max-width:380px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.3); }
+    .gate-box img{ height:64px; margin-bottom:14px; }
+    .gate-box h2{ margin:0 0 6px; font-family:'Prompt','Sarabun',sans-serif; font-size:20px; color:var(--purple-dark); }
+    .gate-box p{ margin:0 0 18px; font-size:14px; color:var(--muted); }
+    .gate-box input{ width:100%; border:1px solid #d1d5db; border-radius:10px; padding:12px 62px; font-family:inherit; font-size:16px; text-align:center; outline:none; }
+    .gate-box input:focus{ border-color:var(--purple); box-shadow:0 0 0 3px rgba(124,58,237,.15); }
+    .pass-wrap{ position:relative; margin-bottom:12px; }
+    .gate-box .pass-toggle{ position:absolute; right:6px; top:50%; transform:translateY(-50%); width:auto; background:none; border:none; box-shadow:none; cursor:pointer; font-size:13px; font-weight:600; color:var(--purple); padding:6px 10px; margin:0; line-height:1; border-radius:8px; }
+    .gate-box .pass-toggle:hover{ background:#f3e8ff; }
+    .gate-box .err{ color:var(--red); font-size:13px; min-height:18px; margin-bottom:8px; }
+    .gate-box button{ width:100%; background:linear-gradient(135deg,#7c3aed,#6d28d9); color:#fff; border:none; border-radius:24px; padding:12px; font-family:inherit; font-size:16px; font-weight:600; cursor:pointer; }
+    .loading{ text-align:center; padding:60px 0; color:var(--muted); font-size:15px; }
+    .hidden{ display:none !important; }
+
+    /* ===== PDF modal + เอกสารราชการ (sync กับ index.html) ===== */
+    .pdf-backdrop{ position:fixed; inset:0; background:rgba(17,24,39,.6); display:none; justify-content:center; padding:78px 16px 40px; z-index:320; overflow-y:auto; }
+    .pdf-backdrop.show{ display:flex; align-items:flex-start; }
+    .float-print,.float-close{ position:fixed; top:22px; border:none; border-radius:28px; padding:12px 24px; font-family:'Sarabun',sans-serif; font-size:16px; font-weight:600; cursor:pointer; z-index:95; box-shadow:0 6px 18px rgba(0,0,0,.25); display:inline-flex; align-items:center; gap:8px; color:#fff; }
+    .float-print{ left:28px; background:linear-gradient(135deg,#10b981,#059669); }
+    .float-close{ right:28px; background:linear-gradient(135deg,#f87171,#ef4444); }
+    .print-hint{ position:fixed; top:70px; left:50%; transform:translateX(-50%); background:rgba(17,24,39,.82); color:#fff; padding:6px 16px; border-radius:20px; font-size:13px; z-index:95; white-space:nowrap; }
+    .doc-paper{ background:#fff; width:210mm; max-width:100%; min-height:287mm; padding:16mm 16mm; box-shadow:0 20px 60px rgba(0,0,0,.3); border-radius:2px; color:#000; font-family:'TH Sarabun New','TH SarabunPSK','Sarabun',serif; font-size:16pt; line-height:1.5; }
+    .od-date{ text-align:right; font-weight:700; margin:14px 0 12px; }
+    .od-para{ text-indent:2.5em; margin-bottom:14px; line-height:1.9; }
+    .od-para b{ font-weight:700; }
+    .od-table{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:14pt; }
+    .od-table th,.od-table td{ border:1px solid #000; padding:5px 4px; text-align:center; vertical-align:middle; word-break:break-word; overflow-wrap:break-word; box-sizing:border-box; }
+    .od-table thead th{ background:#e5e7eb; font-weight:700; font-size:11pt; line-height:1.25; }
+    .od-table td.od-name{ text-align:left; padding-left:6px; white-space:nowrap; word-break:normal; overflow-wrap:normal; overflow:hidden; }
+    .od-empty-row td{ height:30px; }
+    .od-sign{ margin-top:20px; font-size:15pt; }
+    .od-sign .intro{ text-indent:2.5em; margin-bottom:24px; }
+    .od-sign .sign-block{ text-align:center; float:right; min-width:260px; width:max-content; max-width:100%; line-height:2; white-space:nowrap; }
+    .od-sign .sign-block::after{ content:''; display:block; clear:both; }
+    .od-sign-clear{ clear:both; }
+
+    /* ===== เอกสาร "บัญชีรายชื่อนักเรียนไม่ถึง 70%" (รวมทุกวิชา จัดกลุ่มตามระดับชั้น) ===== */
+    .sl-head{ position:relative; text-align:center; margin-bottom:8px; min-height:80px; }
+    .sl-head .sl-school{ position:absolute; top:2px; right:0; text-align:right; font-size:14pt; font-weight:700; line-height:1.4; }
+    .sl-head img{ height:60px; width:auto; display:inline-block; }
+    .sl-title{ font-size:18pt; font-weight:700; line-height:1.35; margin-top:4px; }
+    .sl-meta{ text-align:center; font-size:14pt; margin:2px 0; }
+    .sl-cond{ font-size:13pt; color:#333; margin-top:4px; }   /* บรรทัดบรรยายขอบเขตข้อมูล (ตอนปริ้นตามที่กรอง) */
+    .sl-asof{ text-align:right; font-size:13pt; margin:8px 0 12px; }
+    .sl-grade{ font-size:14pt; font-weight:700; background:#dbeafe; border:1px solid #000; border-bottom:none; padding:5px 10px; margin-top:16px; }
+    .sl-grade:first-of-type{ margin-top:0; }
+    .sl-table{ width:100%; border-collapse:collapse; table-layout:fixed; font-size:13pt; margin-bottom:4px; }
+    .sl-table th,.sl-table td{ border:1px solid #000; padding:4px 5px; text-align:center; vertical-align:middle; word-break:break-word; overflow-wrap:break-word; box-sizing:border-box; }
+    .sl-stu td{ background:#eff6ff; font-weight:700; }                 /* แถวหัวนักเรียน = ฟ้าจางมาก (เข้าชุดหัวชั้น ดูทางการ) */
+    .sl-stu td.sl-name{ text-align:left; padding-left:8px; }
+    .sl-stu .sl-lbl{ display:block; font-size:9.5pt; font-weight:400; line-height:1.2; }   /* label ตัวเล็กในแถวหัวนักเรียน */
+    .sl-subhead th{ background:#f3f4f6; font-weight:700; font-size:10.5pt; line-height:1.25; }
+    .sl-sub td{ font-size:12pt; }
+    .sl-sub td.sl-subj{ text-align:left; padding-left:12px; }
+    .sl-sub td.sl-tea{ text-align:left; padding-left:6px; }
+    .sl-long{ color:#dc2626; font-weight:700; }                       /* หมายเหตุ "ขาดเรียนนาน" = แดง */
+    .sl-empty{ text-align:center; font-size:14pt; padding:30px 0; }
+
+    @media print{
+      body{ background:#fff !important; padding:0 !important; }
+      /* บังคับพิมพ์สีพื้นหลัง (แถบสีหัวตาราง/แถวนักเรียน/หัวชั้น) ไม่ให้เบราว์เซอร์ตัดทิ้งตอนพิมพ์ */
+      .doc-paper, .doc-paper *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+      .wrap,.float-print,.float-close,.print-hint,.rm-backdrop{ display:none !important; }
+      .pdf-backdrop{ position:static !important; display:block !important; background:none !important; padding:0 !important; overflow:visible !important; }
+      .doc-paper{ position:static !important; box-shadow:none !important; border-radius:0 !important; width:100% !important; max-width:none !important; min-height:0 !important; padding:0 !important; }
+      .od-table{ page-break-inside:auto; }
+      .od-table thead{ display:table-header-group; }
+      .od-table tr{ page-break-inside:avoid; }
+      .sl-table{ page-break-inside:auto; }
+      .sl-table tr{ page-break-inside:avoid; }                          /* ไม่ตัดกลางแถว */
+      .sl-grade{ page-break-after:avoid; break-after:avoid; page-break-inside:avoid; }  /* หัวชั้นไม่ห้อยท้ายหน้า */
+      @page{ size:A4 portrait; margin:14mm; }
+    }
+    /* Toast เด้งเตือนรายงานใหม่ (มุมขวาล่าง) */
+    .rt-toast{ position:fixed; right:20px; bottom:20px; max-width:340px; background:linear-gradient(135deg,#7c3aed,#6d28d9); color:#fff; padding:14px 20px; border-radius:14px; font-size:15px; font-weight:600; box-shadow:0 10px 30px rgba(76,29,149,.4); z-index:9999; opacity:0; transform:translateY(20px); transition:opacity .3s, transform .3s; pointer-events:none; }
+    .rt-toast.show{ opacity:1; transform:translateY(0); }

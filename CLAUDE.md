@@ -4,67 +4,108 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Single-page attendance reporting form for **โรงเรียนชานุมานวิทยาคม** (Chanuman Wittayakhom School). Teachers fill in subject info and list students with attendance below 70%, then save to Google Sheet and export a Thai government-style A4 PDF.
+Attendance reporting system for **โรงเรียนชานุมานวิทยาคม** (Chanuman Wittayakhom School). Teachers report students whose attendance is below 70% (`THRESHOLD`). Two front-end pages backed by a Google Apps Script + Google Sheet:
 
-**No build system.** Everything is vanilla JS in one `index.html` file. There is no npm, no bundler, no transpiler.
+- **`index.html`** — data-entry form. Teacher fills subject + student rows, reviews, saves to the Sheet, and prints a Thai government-style A4 PDF.
+- **`report.html`** — password-protected dashboard. Reads all submissions back, shows KPI cards + drill-down cards + a sortable/filterable master table, and prints two kinds of PDF.
+
+**No build system.** Vanilla JS/CSS — no npm, bundler, or transpiler. Each page's CSS and JS are split into `css/` and `js/`, loaded via `<link>` / `<script src>`.
+
+## Files
+
+| File | Role |
+|---|---|
+| `index.html` | Teacher data-entry form markup |
+| `report.html` | Dashboard markup |
+| `css/index.css`, `css/report.css` | Per-page styles (incl. `@font-face` + PDF document styles) |
+| `js/index.js`, `js/report.js` | Per-page scripts (all logic) |
+| `Code.gs` | Google Apps Script backend (lives in Apps Script console; copy kept in repo) |
+| `fonts/*.woff2` | TH Sarabun New, 4 styles, self-hosted web font |
+| `_headers` | Netlify cache rules (HTML no-cache, fonts immutable) |
+| `logo.png` | School crest (used by `report.html`; `index.html` embeds it as base64) |
 
 ## Running Locally
 
-Serve `index.html` directly — any static file server works:
+Static files — any server works. Preview server is preconfigured (`.claude/launch.json`, name `attendance`, port 4124):
 
 ```bash
-# Using the Claude Code preview server (already configured):
-# Just open http://localhost:4124 — the preview server points to D:\attendance-report-chanu\
-
-# Or with Python:
+# open http://localhost:4124/index.html  or  /report.html
 python -m http.server 4124 --directory "D:/attendance-report-chanu"
 ```
 
 ## Architecture
 
-### index.html (single file, ~1.3MB)
+Each page = `*.html` (markup) + `css/*.css` (styles, incl. `@font-face` and the PDF document styles) + `js/*.js` (all logic). The two pages do **not** share CSS/JS files — see the `buildDoc` gotcha below.
 
-All CSS, JS, and the school logo (base64-embedded) live in one file. Key JS sections:
+### index.html — data-entry form
 
 | Function | Purpose |
 |---|---|
-| `collectData()` | Reads all form fields + student table rows into a plain object |
-| `validate(d)` | Returns array of error strings; marks invalid fields red |
-| `setSaved(v)` / `markUnsaved()` | Guards the PDF export button — must save before exporting; any form `input`/`change` event resets saved state |
-| `buildDoc(d)` | Builds the official A4 HTML document injected into `#printArea` |
-| `addRow()` | Dynamically creates a student table row with auto-calculated absent hours and % |
+| `addRow()` | Builds a student table row entirely in JS (no HTML template); auto-calcs absent hrs + %; class `ม.[level]/[room]` input auto-advances after 1 digit |
+| `collectData()` | Reads form fields + table rows into a plain object |
+| `validate(d)` | Returns error strings, marks invalid fields red; blocks seat-number duplicates and students at/above 70% |
+| `markSeatDups()` | Real-time duplicate-seat highlighting while typing |
+| save guard | `dataSaved` flag; the 2-step flow is **review modal → confirm popup → POST**; any edit re-locks via `markUnsaved()` |
+| `buildDoc(d)` + `fitNames()` | Builds the official A4 document into `#printArea`; `fitNames()` shrinks long names via canvas measure |
 
-**Two-step save guard:** `dataSaved` flag starts `false`. The PDF export button is disabled until `setSaved(true)` is called after a successful save. Any subsequent edit calls `markUnsaved()` which disables the button again.
+- **Submit:** JSONP/`no-cors` POST to `SHEET_URL` with a `submissionId` (re-saving from the same open page overwrites; a new page appends). A 15s timeout + a follow-up `action=verify` GET (counts rows by `submissionId`) confirm the write actually landed, since `no-cors` fetch always resolves.
+- **Logo:** base64-embedded in `src` (2 places: web banner + PDF header). Re-encode `logo.png` and replace both `data:image/png;base64,...`.
 
-**PDF generation:** Uses `window.print()` on `#printArea` (a styled div inside `.pdf-backdrop` modal). Print CSS hides everything except `#printArea` and uses `display: table-header-group` so thead repeats on every page.
+### report.html — dashboard
 
-**Student table rows** are created entirely in JS via `addRow()` — no HTML template. The `ม.[level]/[room]` class input auto-advances to the room field after 1 digit.
+- **Password gate:** JSONP `doGet(?key=...)`; server validates before returning data.
+- **`allRows`** holds every Sheet row (one per student). Grouping helpers rebuild higher-level views:
+  - `buildStudentGroups` (per student, with subjects sub-rows + overall % from total present/total periods), `buildReportGroups` (per submission timestamp), `buildTeacherGroups`, `buildSubjectGroups`.
+- **KPI cards** open detail modals via `openCardModal(type)`; the student card (`renderStudentTable`) has its own filter bar + expandable rows.
+- **Multi-level sort + column pinning** (all tables): state is `{pins:[{key,dir}], active:{key,dir}|null}`. `sortChain` flattens pins+active; `applyMultiSort` sorts down the chain (num/date/Thai-string). `onSortClick` / `onPinClick` mutate state; `sortHeadHTML` renders the 📌 pin + order superscript; `bindSortHeads` wires events; `paintPinned` tints the whole pinned column amber (scoped to the outer table, skips nested sub-tables).
+- **Two PDFs share `#printArea` + `window.print()`:**
+  - `openPdfForReport(ts)` → `buildDoc()` — single teacher/subject form (groups rows by timestamp).
+  - `openStudentListPdf('all'|'filtered')` → `buildStudentListDoc()` — "บัญชีรายชื่อ" across all subjects, grouped by grade level, no signature block. `buildStuFilterDesc()` writes the scope sentence.
+- **Realtime:** polling re-fetches and toasts when new submissions appear.
 
-**Logo:** School crest is base64-encoded directly into `src` attributes (2 occurrences: web banner + PDF header). To update the logo, re-encode `logo.png` to base64 and replace both `src="data:image/png;base64,..."` values.
+### Code.gs — Google Apps Script backend
 
-### Code.gs (Google Apps Script backend)
+Web App bound to a spreadsheet with a **"รายงาน"** sheet (22 columns: 21 data fields + `submission_id`).
 
-Deployed as a Web App at the URL hardcoded in `index.html` (`SHEET_URL`). Receives `POST` with `Content-Type: text/plain` and `mode: 'no-cors'` from the Netlify-hosted frontend. Writes one row per student to the "รายงาน" sheet of the bound spreadsheet.
+| Entry | Purpose |
+|---|---|
+| `doGet` | `action=verify` → count rows by `sid` (no password, no data). Else check `key` against `REPORT_PASSWORD` (Script Property) / `DEFAULT_REPORT_PASSWORD`, then return all rows. Replies as **JSONP** (avoids CORS). |
+| `doPost` | `saveToSheet(JSON body)` |
+| `saveToSheet` | `LockService` (serializes concurrent writers); `removeRowsBySubmissionId` then batch-write = **same submissionId overwrites, new one appends**; aborts if `students` is empty (never deletes old data with nothing to write back). |
 
-**Important:** Because the frontend uses `mode: 'no-cors'`, the fetch always resolves (never rejects) regardless of server response. The frontend shows "saved" toast on resolve, not on confirmed server success.
+`readSheet` reads by a **fixed column order** (not Sheet headers) so a stale header row can't break mapping. Dates → ISO strings.
 
-## Key Constants (top of `<script>` in index.html)
+## Data Flow
 
-```js
-var THRESHOLD = 70;       // attendance percentage threshold
-var MIN_DOC_ROWS = 10;    // minimum blank rows in exported PDF
-var PREFIX_OPTIONS = ['ด.ช.','ด.ญ.','นาย','น.ส.']; // student name prefixes
-var REMARK_OPTIONS = ['-- เลือก --','ขาดเรียนนาน','อื่นๆ (กรอกเอง)'];
 ```
+index.html  --POST no-cors JSON-->  Code.gs doPost --> saveToSheet --> "รายงาน" sheet
+index.html  --GET verify (JSONP)-->  Code.gs doGet  --> countBySubmissionId   (confirm save)
+report.html --GET key=pass (JSONP)-> Code.gs doGet  --> readSheet --> allRows  (dashboard)
+```
+
+## Key Constants
+
+- `index.html`: `THRESHOLD = 70`, `MIN_DOC_ROWS = 10`, `PREFIX_OPTIONS`, `REMARK_OPTIONS`
+- `report.html`: `SHEET_URL`, `THRESHOLD = 70`, `MIN_DOC_ROWS = 10`, `COL` (Sheet column-name map)
+- `Code.gs`: `DEFAULT_REPORT_PASSWORD` (override with Script Property `REPORT_PASSWORD`)
+
+## Fonts (self-hosted)
+
+`fonts/THSarabunNew*.woff2` (regular/bold/italic/bolditalic) declared via `@font-face` (family `'TH Sarabun New'`) at the top of `css/index.css` and `css/report.css`. The font URL is `../fonts/...` because the CSS now lives in `css/` (this was rewritten during the CSS/JS split — keep it if you move files). This makes the official document render identically on machines without the font installed (the original cross-device bug). `.doc-paper` keeps `font-family:'TH Sarabun New',...` — `@font-face` makes the browser use the web font over any local copy. Converted from `.ttf` with Python `fontTools` (`f.flavor='woff2'`).
 
 ## Deployment
 
-- **Frontend:** Netlify (static, auto-deploys from `pixxarz/listless` GitHub repo on push to `main`)
-- **Backend:** Google Apps Script — after editing `Code.gs`, must re-deploy in Apps Script console (Manage Deployments → new version) to take effect. The `SHEET_URL` in `index.html` does **not** change between versions.
+- **Frontend:** Netlify — auto-deploys from `pixxarz/listless` (`origin`) on push to `main`. A personal backup repo `sirawitphaopha/listless70` (`mine`, private) holds the same history.
+- **Backend:** edit `Code.gs` in Apps Script → **Manage deployments → New version** (the `SHEET_URL` does not change between versions). Repo copy is reference only — deploying it is the friend's job.
+- **`_headers`** is read by Netlify automatically: HTML `max-age=0, must-revalidate` (teachers always get the latest), `fonts/*` `max-age=1yr, immutable`.
 
-## CSS Architecture
+## Conventions & Gotchas
 
-All styles are `<style>` in `<head>`. Two separate visual contexts share the same file:
-
-1. **Web form** — uses CSS custom properties (`--purple`, `--pink`, etc.), responsive grid header, purple table headers via `#studentTable thead th` (scoped to avoid leaking into PDF)
-2. **PDF document** (`.doc-paper`, `.od-*`) — uses `font-family: 'TH Sarabun New'`, `table-layout: fixed` on `.od-table`, and `position: static` in print media. Global `table {}` rules must NOT set `min-width` — it must only be on `#studentTable` to avoid breaking PDF table layout.
+- **Timezone:** Sheet datetimes are UTC; always `+7*3600*1000` before formatting Thai dates (`fmtDate`/`thaiDate`/`fmtTime` all do this — a recurring bug source).
+- **`no-cors`:** submit fetch always resolves; never trust it for success — use the `verify` round-trip.
+- **`window.print()` only** — there is intentionally no client PDF library (pdfmake/html2pdf were removed). Single button "🖨 พิมพ์ / บันทึก PDF".
+- **Print color:** `@media print` sets `print-color-adjust:exact` on `.doc-paper *` so header/grade band colors survive printing.
+- **Mobile table:** `.table-wrap` gets `overflow-x:auto` only under `@media (max-width:720px)` — doing it globally would turn `overflow-y` to `auto` and break the sticky form header on desktop.
+- **`buildDoc`/`fitNames`/`thaiDate` are NOT shared** — `js/index.js` and `js/report.js` each keep their own copy and they genuinely differ: `index` embeds the logo as base64 + uses form-shaped data; `report` uses `logo.png` + grouped data + the +7 timezone fix. They were checked during the split and deliberately left separate — do not try to merge them into a shared file.
+- **No version numbering** — do not bump or invent versions.
+- **UI text contains no `?` character** (project convention) and uses Thai with English in parentheses for technical terms.
