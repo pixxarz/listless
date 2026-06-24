@@ -923,29 +923,60 @@
     document.getElementById('stuCount').textContent='พบ '+groups.length+' คน'+( (q||pr||code) ? ' (กรองแล้ว)' : '' );
     var wrap=document.getElementById('stuTableWrap');
     if(!groups.length){ wrap.innerHTML='<div class="empty-hint">ไม่พบนักเรียนตามเงื่อนไข</div>'; return; }
-    var eh='<table class="rm-table rm-exp"><thead><tr>'+sortHeadHTML(STU_COLS, studentSort)+'</tr></thead><tbody>';
-    groups.forEach(function(g,gi){
-      eh+='<tr class="exp-main" data-gi="'+gi+'"><td class="exp-toggle"><span class="exp-arrow">▶</span></td>';
-      STU_COLS.forEach(function(col,ci){ var cn=col.center?' class="num"':''; var v=(col.disp||col.get)(g); eh+='<td'+cn+(ci===0?' data-tip="กดเพื่อดู / ซ่อนรายวิชาที่ขาด"':'')+'>'+esc(v==null?'':v)+'</td>'; });
-      eh+='</tr>';
-      eh+='<tr class="exp-sub" data-gi="'+gi+'" style="display:none"><td></td><td colspan="'+STU_COLS.length+'">';
-      eh+='<table class="rm-subtable rm-sub-stu"><thead><tr>';
-      cfg.subHeaders.forEach(function(sh){ eh+='<th>'+esc(sh)+'</th>'; });
-      eh+='</tr></thead><tbody>';
-      g.sub.forEach(function(srow){ eh+='<tr>'; srow.forEach(function(sc){ eh+='<td>'+esc(sc)+'</td>'; }); eh+='</tr>'; });
-      eh+='</tbody></table></td></tr>';
-    });
-    eh+='</tbody></table>';
-    wrap.innerHTML=eh;
-    wrap.querySelectorAll('.exp-main').forEach(function(tr){
-      tr.addEventListener('click', function(){
-        var gi=this.getAttribute('data-gi');
-        var subRow=wrap.querySelector('.exp-sub[data-gi="'+gi+'"]');
-        var arrow=this.querySelector('.exp-arrow');
-        if(subRow){ var isOpen=subRow.style.display!=='none'; subRow.style.display=isOpen?'none':'table-row'; if(arrow) arrow.textContent=isOpen?'▶':'▼'; this.classList.toggle('open',!isOpen); }
-      });
+    // ===== virtual scroll: วาดเฉพาะแถวที่อยู่ในจอ + ช่องว่างบน/ล่าง (กัน Chrome/Edge ค้าง 20 วิตอนวาดตารางใหญ่ในกล่อง scroll พร้อมกัน) =====
+    var scrollEl = wrap.closest('.rm-scroll') || wrap;
+    var COLN = STU_COLS.length+1;
+    wrap.innerHTML='<table class="rm-table rm-exp"><thead><tr>'+sortHeadHTML(STU_COLS, studentSort)+'</tr></thead><tbody></tbody></table>';
+    var vtbody=wrap.querySelector('tbody');
+    var ROW_H=41, BUFFER=8, expanded={}, subH={};
+    function buildSub(g){
+      var sh='<table class="rm-subtable rm-sub-stu"><thead><tr>';
+      cfg.subHeaders.forEach(function(h){ sh+='<th>'+esc(h)+'</th>'; });
+      sh+='</tr></thead><tbody>';
+      g.sub.forEach(function(srow){ sh+='<tr>'; srow.forEach(function(sc){ sh+='<td>'+esc(sc)+'</td>'; }); sh+='</tr>'; });
+      return sh+'</tbody></table>';
+    }
+    function mainRow(g,gi){
+      var h='<tr class="exp-main'+(expanded[gi]?' open':'')+'" data-gi="'+gi+'"><td class="exp-toggle"><span class="exp-arrow">'+(expanded[gi]?'▼':'▶')+'</span></td>';
+      STU_COLS.forEach(function(col,ci){ var cn=col.center?' class="num"':''; var v=(col.disp||col.get)(g); h+='<td'+cn+(ci===0?' data-tip="กดเพื่อดู / ซ่อนรายวิชาที่ขาด"':'')+'>'+esc(v==null?'':v)+'</td>'; });
+      return h+'</tr>';
+    }
+    function subRowHtml(g,gi){ return '<tr class="exp-sub" data-gi="'+gi+'"><td></td><td colspan="'+STU_COLS.length+'">'+buildSub(g)+'</td></tr>'; }
+    function rowH(gi){ return ROW_H + (expanded[gi] ? (subH[gi]||140) : 0); }
+    function renderWindow(){
+      var off=[0], i; for(i=0;i<groups.length;i++){ off.push(off[i]+rowH(i)); }
+      var total=off[groups.length], st=scrollEl.scrollTop, vh=scrollEl.clientHeight||600;
+      var start=0; while(start<groups.length && off[start+1]<=st) start++;
+      var end=start; while(end<groups.length && off[end]<st+vh) end++;
+      start=Math.max(0,start-BUFFER); end=Math.min(groups.length,end+BUFFER);
+      var html=''; if(off[start]>0) html+='<tr class="vspacer"><td colspan="'+COLN+'" style="padding:0;border:none;height:'+off[start]+'px"></td></tr>';
+      for(var gi=start; gi<end; gi++){ html+=mainRow(groups[gi],gi); if(expanded[gi]) html+=subRowHtml(groups[gi],gi); }
+      var bot=total-off[end]; if(bot>0) html+='<tr class="vspacer"><td colspan="'+COLN+'" style="padding:0;border:none;height:'+bot+'px"></td></tr>';
+      vtbody.innerHTML=html;
+    }
+    scrollEl._vrender=renderWindow;   // expose ไว้สำหรับทดสอบ/บังคับวาดใหม่
+    if(scrollEl._vhandler) scrollEl.removeEventListener('scroll', scrollEl._vhandler);   // กันผูก scroll listener ซ้ำตอน re-render (เรียง/กรอง)
+    var ticking=false;
+    scrollEl._vhandler=function(){ if(!ticking){ ticking=true; requestAnimationFrame(function(){ ticking=false; renderWindow(); }); } };
+    scrollEl.addEventListener('scroll', scrollEl._vhandler);
+    vtbody.addEventListener('click', function(e){
+      var tr=e.target.closest('.exp-main'); if(!tr) return;
+      var gi=+tr.getAttribute('data-gi');
+      if(expanded[gi]){ delete expanded[gi]; }
+      else {
+        expanded[gi]=true;
+        if(!subH[gi]){   // วัดความสูงตารางย่อยครั้งแรก เพื่อให้ช่องว่าง (spacer) คำนวณแม่น
+          var tmp=document.createElement('div'); tmp.style.cssText='position:absolute;visibility:hidden;left:-9999px;width:'+(vtbody.offsetWidth||800)+'px';
+          tmp.innerHTML='<table class="rm-table rm-exp" style="width:100%"><tbody>'+subRowHtml(groups[gi],gi)+'</tbody></table>';
+          document.body.appendChild(tmp); var se=tmp.querySelector('.exp-sub'); subH[gi]=(se?se.offsetHeight:140)||140; document.body.removeChild(tmp);
+        }
+      }
+      renderWindow();
     });
     bindSortHeads(wrap, STU_COLS, studentSort, function(){ renderStudentTable(cfg); });
+    scrollEl.scrollTop=0;
+    renderWindow();
+    var fr=vtbody.querySelector('.exp-main'); if(fr){ var rh=fr.offsetHeight; if(rh>15 && Math.abs(rh-ROW_H)>2){ ROW_H=rh; renderWindow(); } }   // ปรับความสูงแถวจริงแล้ววาดใหม่ให้ช่องว่างแม่น
   }
   // render ตารางใบรายงานในป๊อปอัป ตามตัวกรอง + เรียงลำดับ + กดขยายดูรายชื่อในใบ
   function renderReportTable(cfg){
