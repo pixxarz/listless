@@ -69,36 +69,138 @@
   function firstName(s){ return baseName(s).split(' ')[0]||''; }
 
   /* ---------- ที่เก็บผลการตัดสิน ----------
-     ตอนนี้เก็บในเครื่อง (localStorage) ชั่วคราว
-     เมื่อฝั่ง Apps Script เพิ่มแผ่น "แก้ข้อมูล" แล้ว ให้สลับ adapter ตัวนี้เป็นการอ่าน/เขียนผ่าน API
-     รูปแบบข้อมูลออกแบบให้ตรงกับคอลัมน์ในชีตอยู่แล้ว จึงสลับได้โดยไม่ต้องแก้ส่วนอื่น
+     ความจริงอยู่ที่แผ่น "แก้ข้อมูล" ในชีต (Code.gs → readFixes / saveFix)
+     ทุกเครื่องที่เปิดหน้ารายงานจึงเห็นผลการตรวจชุดเดียวกัน และไม่หายเมื่อล้างเบราว์เซอร์
+
+     เก็บ 3 ชั้น — จำเป็น เพราะการส่งขึ้น Apps Script ต้องใช้ no-cors ซึ่ง "อ่านคำตอบไม่ได้เลย"
+     ยิงไปแล้วจึงไม่มีทางรู้จากตัว fetch ว่าถึงชีตจริงไหม (บั๊กเดียวกับที่หน้ากรอกเคยเจอ)
+       serverList = สิ่งที่อยู่ในชีตจริง — ได้มาจาก doGet ตอนโหลด/ตอนเช็ครายงานใหม่
+       queue      = รายการที่กดแล้วแต่ยังไม่ยืนยันว่าถึงชีต เก็บลงเครื่องด้วยกันหายตอนปิดหน้า
+       decisions  = serverList ทับด้วย queue = สิ่งที่หน้าจอเห็น (กดแล้วเห็นผลทันที ไม่ต้องรอเน็ต)
+     ยืนยันด้วยการ "อ่านกลับ" (action=fixes) แบบเดียวกับที่หน้ากรอกใช้ action=verify
      ดู docs/spec-code-gs-fixes.md
      ------------------------------------------------- */
-  var STORE_KEY='chanu_data_fixes_v1';
-  var decisions=[];   // [{id,type,action,value,members,by,at}]
+  var OLD_KEY='chanu_data_fixes_v1';        // ที่เก็บเดิม (เก็บในเครื่องล้วน) — ย้ายขึ้นชีตให้อัตโนมัติ
+  var QUEUE_KEY='chanu_data_fixes_queue_v1';
+  var serverList=[];  // [{id,type,action,value,members,title,by,at}] ตามที่อยู่ในชีต
+  var queue=[];       // [{id, rec:{...}}] = บันทึก · [{id, remove:true}] = ยกเลิกการตัดสิน
+  var decisions=[];   // ผลรวมที่ทุกส่วนของหน้าจอใช้
+  var api={ url:'', key:'', ready:false };  // ready=false → Apps Script ที่ deploy ไว้ยังเป็นเวอร์ชันเก่า
+  var sync={ busy:false, okAt:0 };
 
   function storage(){ try{ return window.localStorage; }catch(e){ return null; } }
-  function loadDecisions(){
-    var st=storage(); if(!st) { decisions=[]; return decisions; }
-    try{ var raw=st.getItem(STORE_KEY); decisions=raw?(JSON.parse(raw)||[]):[]; }catch(e){ decisions=[]; }
-    return decisions;
-  }
-  function saveDecisions(){
+  function findIn(list,id){ for(var i=0;i<list.length;i++){ if(list[i].id===id) return list[i]; } return null; }
+
+  // ลายเซ็นของการตัดสิน 1 รายการ — ใช้เทียบว่าที่อยู่ในชีตตรงกับที่เพิ่งกดไปหรือยัง
+  // ค่าของวิชาเป็น object (ชื่อ+รหัส) จึงต้องแปลงเป็นข้อความก่อนเทียบ · null กับ '' ถือว่าค่าเดียวกัน
+  // (ตอนกด "ไม่ต้องแก้" ฝั่งเว็บส่ง null แต่ชีตเก็บเป็นช่องว่าง)
+  function valStr(v){ return (v===null||v===undefined)?'':((typeof v==='object')?JSON.stringify(v):String(v)); }
+  function sig(d){ return d?(String(d.action||'')+'|'+valStr(d.value)+'|'+(d.members||[]).join('||')):''; }
+
+  function loadQueue(){
     var st=storage(); if(!st) return;
-    try{ st.setItem(STORE_KEY, JSON.stringify(decisions)); }catch(e){}
+    try{ queue=JSON.parse(st.getItem(QUEUE_KEY)||'[]')||[]; }catch(e){ queue=[]; }
+    // ย้ายผลการตัดสินที่ค้างอยู่ในที่เก็บเดิมมาเข้าคิว — ของเดิมยังไม่เคยขึ้นชีตเลยสักรายการ
+    try{
+      var old=JSON.parse(st.getItem(OLD_KEY)||'[]')||[];
+      old.forEach(function(d){ if(d && d.id && !findIn(queue,d.id)) queue.push({ id:d.id, rec:d }); });
+      if(old.length) st.removeItem(OLD_KEY);   // ย้ายเข้าคิวแล้ว (คิวก็เก็บในเครื่อง) จึงไม่มีอะไรหาย
+    }catch(e){}
+    saveQueue();
   }
-  function findDecision(id){
-    for(var i=0;i<decisions.length;i++){ if(decisions[i].id===id) return decisions[i]; }
-    return null;
+  function saveQueue(){
+    var st=storage(); if(!st) return;
+    try{ st.setItem(QUEUE_KEY, JSON.stringify(queue)); }catch(e){}
   }
-  function putDecision(d){
-    var old=findDecision(d.id);
-    if(old){ for(var k in d) old[k]=d[k]; } else decisions.push(d);
-    saveDecisions();
+
+  // ผลรวมที่หน้าจอเห็น = ของในชีต แล้วเอาคิวทับ (ลบออกถ้าคิวสั่งยกเลิก)
+  function rebuild(){
+    var out=serverList.filter(function(d){ var q=findIn(queue,d.id); return !q; });
+    queue.forEach(function(q){ if(!q.remove && q.rec) out.push(q.rec); });
+    decisions=out;
   }
-  function removeDecision(id){
-    decisions=decisions.filter(function(d){ return d.id!==id; });
-    saveDecisions();
+  function setServer(list){ serverList=(list||[]).slice(); rebuild(); }
+
+  // ตัดรายการที่ชีตรับไปแล้วออกจากคิว — เทียบทั้ง id และลายเซ็น กันกรณีชีตยังเป็นค่าเก่า
+  function reconcile(){
+    queue=queue.filter(function(q){
+      var on=findIn(serverList,q.id);
+      return q.remove ? !!on : !(on && sig(on)===sig(q.rec));
+    });
+    saveQueue(); rebuild();
+  }
+
+  function findDecision(id){ return findIn(decisions,id); }
+  function putDecision(d){ queueUp({ id:d.id, rec:d }); }
+  function removeDecision(id){ queueUp({ id:id, remove:true }); }
+  function queueUp(q){
+    queue=queue.filter(function(x){ return x.id!==q.id; });
+    queue.push(q);
+    saveQueue(); rebuild();
+    if(flushing) dirty=true;   // เผื่อเข้ามาตอนรอบนั้นเลยขั้นส่งไปแล้ว — finish() จะเปิดรอบใหม่ให้
+    else flush();
+  }
+
+  /* ---------- คุยกับ Apps Script ---------- */
+  // JSONP (ขาอ่าน) — เลี่ยง CORS แบบเดียวกับที่หน้ารายงานใช้ดึงข้อมูลหลัก
+  function jsonpGet(params, cb){
+    var name='__fx'+(new Date().getTime())+'_'+Math.floor(Math.random()*1e9);
+    var s=document.createElement('script'), done=false;
+    var timer=setTimeout(function(){ if(!done){ done=true; cleanup(); cb(null); } }, 20000);
+    function cleanup(){ clearTimeout(timer); try{ delete window[name]; }catch(e){ window[name]=undefined; } if(s.parentNode) s.parentNode.removeChild(s); }
+    window[name]=function(d){ if(done) return; done=true; cleanup(); cb(d); };
+    var q=[]; for(var k in params){ q.push(encodeURIComponent(k)+'='+encodeURIComponent(params[k])); }
+    q.push('callback='+name);
+    s.src=api.url+'?'+q.join('&');
+    s.onerror=function(){ if(!done){ done=true; cleanup(); cb(null); } };
+    document.body.appendChild(s);
+  }
+  // ขาเขียน — no-cors ส่งได้แต่อ่านผลไม่ได้ จึงต้องไปยืนยันด้วยการอ่านกลับเสมอ
+  function post(body, cb){
+    var opts={ method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'}, body:JSON.stringify(body) };
+    var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
+    var tm=null;
+    if(ctrl){ opts.signal=ctrl.signal; tm=setTimeout(function(){ try{ ctrl.abort(); }catch(e){} }, 20000); }
+    fetch(api.url, opts).then(function(){ if(tm) clearTimeout(tm); cb(); }, function(){ if(tm) clearTimeout(tm); cb(); });
+  }
+  // ห่อรายการในคิวเป็น payload — ตัวรายการต้องอยู่ใน fix ไม่ใช่ระดับบนสุด
+  // เพราะระดับบนสุดใช้ช่อง action บอกชนิดคำสั่ง (savefix) ส่วนในรายการ action คือ merge/ignore
+  function payload(q){
+    var fix=q.remove ? { id:q.id, remove:true } : q.rec;
+    return { action:'savefix', key:api.key, fix:fix };
+  }
+
+  var flushing=false, dirty=false;
+  function qKey(q){ return q.id+'|'+(q.remove?'ลบ':sig(q.rec)); }
+  function flush(){
+    if(!api.ready || flushing || !queue.length) { paintSync(); return; }
+    flushing=true; dirty=false; sync.busy=true; paintSync();
+    // ไล่ส่งจากคิวตัวจริง ไม่ใช่สำเนา — รายการที่เพิ่งกดเพิ่มระหว่างรอบนี้จะถูกส่งไปด้วยเลย
+    // (โหมดแก้เองกดครั้งเดียวได้ทั้งชื่อและห้อง ถ้าใช้สำเนาจะไปแค่ตัวแรก อีกตัวค้างรอรอบหน้า)
+    var sent={};
+    (function next(){
+      var q=null;
+      for(var i=0;i<queue.length;i++){ if(!sent[qKey(queue[i])]){ q=queue[i]; break; } }
+      if(!q){ verify(0); return; }
+      sent[qKey(q)]=1;
+      post(payload(q), next);
+    })();
+    // ชีตเขียนเสร็จช้ากว่าตอนที่ fetch คืนค่า (แถมมีคิวรอ lock) — อ่านกลับซ้ำได้ถึง 3 รอบก่อนยอมแพ้
+    function verify(round){
+      jsonpGet({ action:'fixes', key:api.key }, function(d){
+        if(d && d.result==='OK' && Object.prototype.toString.call(d.fixes)==='[object Array]'){
+          setServer(d.fixes); reconcile();
+        }
+        if(!queue.length || round>=2){ finish(); return; }
+        setTimeout(function(){ verify(round+1); }, 1500*(round+1));
+      });
+    }
+    function finish(){
+      flushing=false; sync.busy=false;
+      if(!queue.length) sync.okAt=new Date().getTime();
+      paintSync();
+      if(dirty && queue.length){ dirty=false; flush(); }   // มีรายการเข้ามาระหว่างรอบที่แล้ว ส่งต่อให้จบ
+    }
   }
 
   /* ---------- ตัวช่วยอ่านค่าในแถว ---------- */
@@ -371,7 +473,6 @@
 
   function apply(rows){
     if(!COL || !rows || !rows.length) return rows;
-    loadDecisions();
     restore(rows);
     var merges=decisions.filter(function(d){ return d.action==='merge'; });
     if(!merges.length) return rows;
@@ -396,6 +497,8 @@
             r._origCls=r._origCls||cls(r); r[COL.cls]=d.value; r._fixed=true;
           }
         } else if(d.type==='subject'){
+          // ค่าของวิชาต้องเป็น object (ชื่อ+รหัส) เสมอ — ถ้าหลังบ้านคืนมาเป็นข้อความแสดงว่าอ่านค่าผิดรูป ข้ามไป ดีกว่าเขียนทับข้อมูลให้พัง
+          if(!d.value || typeof d.value!=='object') return;
           var hit=(d.members.indexOf(code(r))>=0) || (d.members.indexOf(NOCODE+subjName(r))>=0);
           if(hit && (subjName(r)!==d.value.name || code(r)!==d.value.code)){
             r._origSubject=r._origSubject||(subjName(r)+' ('+code(r)+')');
@@ -475,6 +578,31 @@
       + '<div class="fx-dim">'+t.students.map(function(s){ return esc(s.name)+' : '+esc(s.from)+' → '+esc(s.to); }).join(' · ')+'</div></div>';
   }
 
+  /* ---------- แถบบอกสถานะการบันทึกลงชีต ----------
+     ยิงแบบ no-cors อ่านผลไม่ได้ ถ้าไม่บอกสถานะไว้ ผู้ใช้จะเข้าใจว่าบันทึกแล้วทั้งที่ยังไม่ถึงชีต
+     ------------------------------------------------- */
+  function syncHTML(){
+    if(!api.url) return '';
+    if(!api.ready){
+      return '<div class="fx-sync fx-sync-bad">ยังบันทึกลงชีตไม่ได้ — Apps Script ที่ใช้อยู่ยังเป็นเวอร์ชันเก่า '
+        + 'ผลการตรวจจะอยู่แค่ในเครื่องนี้จนกว่าจะ Deploy เวอร์ชันใหม่ (Deploy → Manage deployments → New version)</div>';
+    }
+    if(sync.busy) return '<div class="fx-sync fx-sync-busy">กำลังบันทึกลงชีต...</div>';
+    if(queue.length){
+      return '<div class="fx-sync fx-sync-bad">ยังไม่ได้บันทึกลงชีต <b>'+queue.length+'</b> รายการ '
+        + '<button type="button" class="fx-retry" id="fxRetry">ลองส่งอีกครั้ง</button></div>';
+    }
+    if(new Date().getTime()-sync.okAt < 6000) return '<div class="fx-sync fx-sync-ok">บันทึกลงชีตแล้ว</div>';
+    return '<div class="fx-sync fx-sync-idle">ผลการตรวจถูกเก็บไว้ในชีต ทุกเครื่องที่เปิดหน้ารายงานเห็นตรงกัน</div>';
+  }
+  // อัปเดตเฉพาะแถบสถานะ ไม่วาดแผงใหม่ทั้งอัน — วาดใหม่ตอนกำลังพิมพ์อยู่จะทำให้ช่องค้นหาหลุดโฟกัส
+  function paintSync(){
+    var el=document.getElementById('fxSync'); if(!el) return;
+    el.innerHTML=syncHTML();
+    var r=document.getElementById('fxRetry');
+    if(r) r.addEventListener('click', function(){ flush(); });
+  }
+
   // สลับระหว่างโหมด "ระบบตรวจพบ" กับ "แก้เอง"
   var panelMode='auto';
   function renderPanel(box, rows, onChange){
@@ -484,7 +612,10 @@
       + (res.counts.pending?' <span class="fx-count">'+res.counts.pending+'</span>':'')+'</button>'
       + '<button type="button" class="fx-mode'+(panelMode==='manual'?' on':'')+'" data-m="manual">แก้เอง</button>'
       + '<span class="fx-who">ผู้ตรวจ <input type="text" id="fxWho" placeholder="ชื่อผู้ตรวจ" value="'+esc(lastWho)+'"></span>'
+      + '<div class="fx-syncwrap" id="fxSync">'+syncHTML()+'</div>'
       + '</div><div id="fxInner"></div>';
+    var rt=document.getElementById('fxRetry');
+    if(rt) rt.addEventListener('click', function(){ flush(); });
     box.querySelectorAll('.fx-mode').forEach(function(b){
       b.addEventListener('click', function(){ panelMode=this.getAttribute('data-m'); renderPanel(box, rows, onChange); });
     });
@@ -762,12 +893,32 @@
   }
 
   /* ---------- API ที่หน้าเว็บเรียกใช้ ---------- */
+  var loaded=false;
+  function ensureLoaded(){ if(loaded) return; loaded=true; loadQueue(); rebuild(); }
+
   var FIXESAPI=window.FIXES={
-    setCol:function(c){ COL=c; loadDecisions(); },
+    setCol:function(c){ COL=c; ensureLoaded(); },
+    // ต่อกับหลังบ้าน — เรียกทันทีที่ล็อกอินผ่าน ก่อน normalizeRows รอบแรก
+    // fixes ที่แนบมากับ doGet เป็นตัวบอกด้วยว่า Apps Script ที่ deploy ไว้รองรับแล้วหรือยัง
+    // (เวอร์ชันเก่าคืนมาแต่ rows ไม่มีช่อง fixes เลย)
+    connect:function(o){
+      ensureLoaded();
+      api.url=o.url||''; api.key=o.key||'';
+      api.ready=(Object.prototype.toString.call(o.fixes)==='[object Array]');
+      if(api.ready) setServer(o.fixes);
+      flush();   // ส่งของที่ค้างจากคราวก่อน (หรือที่ย้ายมาจากที่เก็บเดิม) ขึ้นชีตให้
+    },
+    // ผลการตรวจล่าสุดจากชีต — เรียกทุกครั้งที่ดึงข้อมูลใหม่ เครื่องอื่นกดอะไรไว้จะตามมาเอง
+    setServerFixes:function(list){
+      if(Object.prototype.toString.call(list)!=='[object Array]') return;
+      ensureLoaded(); api.ready=true; setServer(list); reconcile(); paintSync();
+    },
     detect:detect,
     apply:apply,
     render:renderPanel,
     decisions:function(){ return decisions.slice(); },
+    unsent:function(){ return queue.length; },   // จำนวนรายการที่ยังยืนยันไม่ได้ว่าถึงชีต
+    retry:function(){ flush(); },
     decide:function(item, action, value, by){
       putDecision({
         id:item.id, type:item.type, action:action, value:value,
