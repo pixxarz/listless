@@ -29,7 +29,13 @@ function doGet(e) {
       return jsonp(callback, { error: 'unauthorized' });
     }
 
-    return jsonp(callback, { result: 'OK', rows: readSheet() });
+    // ===== ผลการตรวจสอบข้อมูล (ชื่อ / ห้อง / วิชา ที่คนยืนยันแล้ว) =====
+    // มีชื่อนักเรียนและชื่อครูอยู่ในนั้น จึงต้องผ่านการเช็ครหัสผ่านด้านบนก่อนเสมอ
+    if (params.action === 'fixes') {
+      return jsonp(callback, { result: 'OK', fixes: readFixes() });
+    }
+
+    return jsonp(callback, { result: 'OK', rows: readSheet(), fixes: readFixes() });
   } catch (err) {
     Logger.log('doGet error: ' + err); // เก็บรายละเอียดไว้ฝั่งเซิร์ฟเวอร์ ไม่ส่งกลับ
     return jsonp(callback, { error: 'server' });
@@ -48,6 +54,89 @@ function countBySubmissionId(id) {
     if (String(values[r][21]) === String(id)) n++; // submission_id = คอลัม 22 (index 21)
   }
   return n;
+}
+
+// ====================================================
+// แผ่น "แก้ข้อมูล" — เก็บผลการตรวจสอบข้อมูลที่กรอกผิด (ชื่อ / ห้อง / วิชา)
+// ====================================================
+// หน้ารายงานมีระบบตรวจหาข้อมูลที่น่าจะกรอกผิด แล้วให้คนกดยืนยันว่าค่าที่ถูกคืออะไร
+// ผลการยืนยันเก็บไว้ที่แผ่นนี้ ทุกคนที่เปิดหน้ารายงานจึงเห็นตรงกัน
+// ⚠️ ระบบไม่แก้ข้อมูลในแผ่น "รายงาน" เลย ใบต้นฉบับและเอกสารที่ปริ้นไปแล้วยังเป็นค่าเดิมทุกตัวอักษร
+var FIX_SHEET = 'แก้ข้อมูล';
+var FIX_HEADERS = ['id', 'ชนิด', 'การกระทำ', 'ค่าที่ใช้', 'สมาชิก', 'หัวข้อ', 'ผู้ตรวจ', 'เวลา'];
+
+// หาแผ่น ถ้ายังไม่มีก็สร้างให้พร้อมหัวตาราง
+function getFixSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(FIX_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(FIX_SHEET);
+    sh.appendRow(FIX_HEADERS);
+    var head = sh.getRange(1, 1, 1, FIX_HEADERS.length);
+    head.setFontWeight('bold');
+    head.setBackground('#6b21a8');
+    head.setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+// อ่านรายการทั้งหมด — หน้ารายงานเรียกตอนโหลดข้อมูล
+function readFixes() {
+  var sh = getFixSheet_();
+  if (sh.getLastRow() < 2) return [];
+  var values = sh.getDataRange().getValues();
+  var out = [];
+  for (var r = 1; r < values.length; r++) {
+    var row = values[r];
+    if (!row[0]) continue;
+    out.push({
+      id: String(row[0]),
+      type: String(row[1]),
+      action: String(row[2]),
+      value: String(row[3]),
+      members: String(row[4]) ? String(row[4]).split('||') : [],
+      title: String(row[5]),
+      by: String(row[6]),
+      at: (row[7] instanceof Date) ? row[7].toISOString() : String(row[7])
+    });
+  }
+  return out;
+}
+
+// บันทึกหรือลบรายการ — id เดิมทับของเก่า (ลบแถวเก่าก่อนแล้วเขียนใหม่)
+// ส่ง remove:true มา = ยกเลิกการตัดสิน ลบอย่างเดียวไม่เขียนกลับ
+function saveFix(data) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);   // กันหลายคนกดพร้อมกัน เข้าทีละคน
+  try {
+    var sh = getFixSheet_();
+    var id = String(data.id || '');
+    if (!id) throw new Error('ไม่มี id');
+
+    // ลบแถวเดิมของ id นี้ก่อน (ลบจากล่างขึ้นบนกัน index เลื่อน)
+    if (sh.getLastRow() >= 2) {
+      var values = sh.getDataRange().getValues();
+      for (var r = values.length - 1; r >= 1; r--) {
+        if (String(values[r][0]) === id) sh.deleteRow(r + 1);
+      }
+    }
+    if (data.remove) return { result: 'OK', removed: true };
+
+    sh.appendRow([
+      id,
+      String(data.type || ''),
+      String(data.action || ''),
+      String(data.value || ''),
+      (data.members || []).join('||'),
+      String(data.title || ''),
+      String(data.by || ''),
+      new Date()
+    ]);
+    return { result: 'OK' };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ห่อผลลัพธ์เป็น JSONP — เลี่ยงปัญหา CORS เวลาเรียกข้ามโดเมน (Netlify -> Apps Script)
@@ -82,6 +171,18 @@ function readSheet() {
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
+
+    // ===== บันทึก/ลบ ผลการตรวจสอบข้อมูล (มาจากหน้ารายงาน ต้องมีรหัสผ่าน) =====
+    if (data.action === 'savefix') {
+      var props2 = PropertiesService.getScriptProperties();
+      var pass2 = props2.getProperty('REPORT_PASSWORD') || DEFAULT_REPORT_PASSWORD;
+      if (String(data.key || '') !== String(pass2)) throw new Error('unauthorized');
+      saveFix(data);
+      return ContentService
+        .createTextOutput(JSON.stringify({ result: 'OK' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
     saveToSheet(data);
     return ContentService
       .createTextOutput(JSON.stringify({ result: 'OK' }))

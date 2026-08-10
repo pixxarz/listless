@@ -493,9 +493,20 @@
     var inner=document.getElementById('fxInner');
     if(panelMode==='manual') renderManual(inner, rows, function(){ if(onChange) onChange(); });
     else renderAuto(inner, rows, onChange, box);
+    syncStickyTop(box);
+  }
+
+  // แถบที่สองต้องตรึงพอดีใต้แถบแท็บ — วัดความสูงจริงเสมอ ห้ามตั้งเลขตายตัว
+  // เพราะแถบแท็บมี flex-wrap พอจอแคบจะขึ้นบรรทัดใหม่แล้วสูงขึ้น ตำแหน่งตรึงจะเพี้ยนทันที
+  function syncStickyTop(box){
+    var bar=box.querySelector('.fx-modes'); if(!bar) return;
+    var set=function(){ document.documentElement.style.setProperty('--fxtop', bar.offsetHeight+'px'); };
+    set();
+    if(window.ResizeObserver && !bar._ro){ bar._ro=new ResizeObserver(set); bar._ro.observe(bar); }
   }
 
   // โหมดที่ระบบตรวจให้
+  var autoFilter='';
   function renderAuto(box, rows, onChange, outer){
     var res=detect(rows);
     var pending=res.items.filter(function(i){ return !i.decision; });
@@ -508,17 +519,28 @@
     });
     var ordered=pending.concat(doneList);
 
+    // ชิปด้านบนกดกรองได้ — ไม่งั้นกว่าจะถึงการ์ดวิชาต้องเลื่อนผ่านการ์ดชื่อทั้งหมด
+    var chip=function(key,label,n){
+      return '<button type="button" class="fx-chip'+(autoFilter===key?' on':'')+'" data-f="'+key+'">'
+        + label+' <b>'+n+'</b></button>';
+    };
     var h='<div class="fx-top">'
       + '<span class="fx-sum">รอตรวจ <b>'+res.counts.pending+'</b> รายการ</span>'
-      + '<span class="fx-chip">ชื่อนักเรียน '+res.counts.name+'</span>'
-      + '<span class="fx-chip">ชื่อครู '+res.counts.teacher+'</span>'
-      + '<span class="fx-chip">ห้อง '+res.counts.room+'</span>'
-      + '<span class="fx-chip">วิชา '+res.counts.subject+'</span>'
+      + chip('','ทั้งหมด',res.counts.pending)
+      + chip('name','ชื่อนักเรียน',res.counts.name)
+      + chip('teacher','ชื่อครู',res.counts.teacher)
+      + chip('room','ห้อง',res.counts.room)
+      + chip('subject','วิชา',res.counts.subject)
       + '</div>';
-    if(res.tickets.length) h+=res.tickets.map(ticketHTML).join('');
+    if(autoFilter) ordered=ordered.filter(function(it){ return it.type===autoFilter; });
+    if(res.tickets.length && (!autoFilter || autoFilter==='room')) h+=res.tickets.map(ticketHTML).join('');
     h+= ordered.length ? ordered.map(function(it,i){ return cardHTML(it,i); }).join('')
-                       : '<div class="fx-empty">ไม่พบข้อมูลที่ต้องตรวจสอบ</div>';
+                       : '<div class="fx-empty">'+(autoFilter?'ไม่มีรายการในหมวดนี้':'ไม่พบข้อมูลที่ต้องตรวจสอบ')+'</div>';
     box.innerHTML=h;
+
+    box.querySelectorAll('.fx-chip').forEach(function(b){
+      b.addEventListener('click', function(){ autoFilter=this.getAttribute('data-f'); renderAuto(box, rows, onChange, outer); });
+    });
 
     box.querySelectorAll('.fx-card').forEach(function(card){
       var it=ordered[+card.getAttribute('data-idx')];
@@ -570,6 +592,25 @@
      หรือกรอกผิดในใบเดียวจนไม่มีอะไรให้เทียบ — เลือกเองแล้วแก้ได้ตรงๆ
      ------------------------------------------------- */
 
+  // ---- จับของที่ "ผิดชัดๆ แต่ไม่มีคู่ให้เทียบ" ----
+  // ตัวตรวจจับหลักทำงานด้วยการจับคู่ ถ้าชื่อผิดอยู่คนเดียวในระบบจึงเงียบสนิท
+  // เช่น "นางสาวสมหญิง ใจดี" ที่ถูกรายงานใบเดียว — ผิดตั้งแต่แรกเห็นแต่ไม่มีอะไรให้รวมด้วย
+  var ROOM_OK=/^ม\.\d\/\d+$/;
+  function suspectNote(kind, label, extra){
+    var notes=[];
+    if(kind==='subject'){
+      if(!extra) notes.push('ไม่มีรหัสวิชา');
+      else if(!CODE_OK.test(extra)) notes.push('รหัสวิชาผิดรูปแบบ');
+      return notes.join(' · ');
+    }
+    if(hasStuckPrefix(label)) notes.push('มีคำนำหน้าติดมาในชื่อ');
+    if(baseName(label).split(' ').length<2) notes.push('ไม่มีนามสกุล');
+    if(/[0-9๐-๙]/.test(label)) notes.push('มีตัวเลขปนในชื่อ');
+    if(/[^ก-๙a-zA-Z\s.]/.test(label)) notes.push('มีอักขระแปลกในชื่อ');
+    if(kind==='student' && extra && !ROOM_OK.test(extra)) notes.push('รูปแบบห้องไม่ถูกต้อง');
+    return notes.join(' · ');
+  }
+
   // รวบรวมรายการทั้งหมดที่มีในระบบ ตามชนิดที่เลือก
   function listAll(rows, kind){
     var m={}, order=[];
@@ -582,16 +623,36 @@
       if(!m[key]){ m[key]={ key:key, label:label, extra:extra, rows:[] }; order.push(key); }
       m[key].rows.push(r);
     });
+    // สถานะของแต่ละรายการ: ระบบเสนอแล้ว / ตัดสินไปแล้ว / น่าสงสัยแต่ไม่มีคู่ให้เทียบ
+    var res=detect(rows);
+    var pend={}, decided={};
+    res.items.filter(function(i){ return !i.decision; }).forEach(function(i){ (i.members||[]).forEach(function(v){ pend[v]=1; }); });
+    decisions.forEach(function(d){ (d.members||[]).forEach(function(v){ decided[v]=1; }); });
+
     return order.map(function(k){
       var x=m[k];
+      var nk=(kind==='student')?nameKey(x.label):'';
+      var ids=[x.label, x.key, nk].filter(Boolean);
+      var status='', note='';
+      if(ids.some(function(v){ return pend[v]; })) { status='pending'; note='ระบบเสนอให้ตรวจ'; }
+      else if(ids.some(function(v){ return decided[v]; })) { status='decided'; note='แก้ไปแล้ว'; }
+      else { var s=suspectNote(kind, x.label, x.extra); if(s){ status='suspect'; note=s; } }
       return { key:k, label:x.label, extra:x.extra, tickets:countTickets(x.rows), count:x.rows.length,
-               nameKey:(kind==='student'?nameKey(x.label):'') };
-    }).sort(function(a,b){ return String(a.label).localeCompare(String(b.label),'th'); });
+               nameKey:nk, status:status, note:note };
+    }).sort(function(a,b){
+      var rank={ pending:0, suspect:1, '':2, decided:3 };   // ที่ต้องดูก่อนอยู่บนสุด
+      if(rank[a.status]!==rank[b.status]) return rank[a.status]-rank[b.status];
+      return String(a.label).localeCompare(String(b.label),'th');
+    });
   }
 
+  var manualOnly=false;   // กรองเฉพาะรายการที่ต้องดู
   function renderManual(box, rows, onChange){
     var q=(manualQ||'').trim().toLowerCase();
-    var list=listAll(rows, manualKind).filter(function(x){
+    var all=listAll(rows, manualKind);
+    var flagged=all.filter(function(x){ return x.status==='pending' || x.status==='suspect'; }).length;
+    var list=all.filter(function(x){
+      if(manualOnly && x.status!=='pending' && x.status!=='suspect') return false;
       return !q || (x.label+' '+x.extra).toLowerCase().indexOf(q)>=0;
     });
 
@@ -600,15 +661,18 @@
           return '<button type="button" class="fx-mtab'+(manualKind===k?' on':'')+'" data-kind="'+k+'">'
             + (k==='student'?'นักเรียน':(k==='teacher'?'ครูผู้สอน':'รายวิชา'))+'</button>';
         }).join('')
+      + '<button type="button" class="fx-mtab fx-only'+(manualOnly?' on':'')+'" id="fxOnly">'
+      + (manualOnly?'✓ ':'')+'เฉพาะที่ต้องดู'+(flagged?' <span class="fx-count">'+flagged+'</span>':'')+'</button>'
       + '<input type="text" class="fx-msearch" id="fxSearch" placeholder="พิมพ์คำค้นหา..." value="'+esc(manualQ)+'">'
       + '<span class="fx-dim">'+list.length+' รายการ</span></div>';
 
     h+='<div class="fx-mlist">';
-    if(!list.length) h+='<div class="fx-empty">ไม่พบรายการตามคำค้นหา</div>';
+    if(!list.length) h+='<div class="fx-empty">ไม่พบรายการตามเงื่อนไข</div>';
     list.forEach(function(x,i){
-      h+='<label class="fx-mitem"><input type="checkbox" class="fx-mcheck" data-i="'+i+'">'
+      h+='<label class="fx-mitem'+(x.status?' fx-s-'+x.status:'')+'"><input type="checkbox" class="fx-mcheck" data-i="'+i+'">'
         + '<span class="fx-val">'+esc(x.label)+'</span>'
         + (x.extra?'<span class="fx-mextra">'+esc(x.extra)+'</span>':'')
+        + (x.note?'<span class="fx-snote fx-n-'+x.status+'">'+esc(x.note)+'</span>':'')
         + '<span class="fx-dim">'+x.tickets+' ใบ · '+x.count+' รายการ</span></label>';
     });
     h+='</div>';
@@ -617,9 +681,11 @@
     h+='<div class="fx-medit" id="fxEdit"><div class="fx-dim">ติ๊กรายการที่ต้องการแก้ — ติ๊กหลายอันเพื่อรวมเป็นรายการเดียวกัน</div></div>';
     box.innerHTML=h;
 
-    box.querySelectorAll('.fx-mtab').forEach(function(b){
+    box.querySelectorAll('.fx-mtab[data-kind]').forEach(function(b){
       b.addEventListener('click', function(){ manualKind=this.getAttribute('data-kind'); renderManual(box, rows, onChange); });
     });
+    var only=document.getElementById('fxOnly');
+    if(only) only.addEventListener('click', function(){ manualOnly=!manualOnly; renderManual(box, rows, onChange); });
     var s=document.getElementById('fxSearch');
     if(s) s.addEventListener('input', function(){ manualQ=this.value; var pos=this.selectionStart; renderManual(box, rows, onChange);
       var n=document.getElementById('fxSearch'); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos); }catch(e){} } });

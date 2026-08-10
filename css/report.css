@@ -244,13 +244,47 @@
     .btn-fix:hover{ background:#ffedd5; }
     .fx-count{ display:inline-block; min-width:20px; padding:1px 7px; margin-left:4px; border-radius:999px; background:#ea580c; color:#fff; font-size:12px; font-weight:700; }
     .fx-count.zero{ background:#9ca3af; }
-    .fx-modes{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; border-bottom:2px solid var(--line); padding-bottom:0; margin-bottom:14px; }
-    .fx-mode{ background:none; border:none; border-bottom:3px solid transparent; padding:9px 16px; margin-bottom:-2px; font-family:inherit; font-size:15px; color:var(--muted); cursor:pointer; }
-    .fx-mode.on{ color:var(--purple-dark); border-bottom-color:var(--purple); font-weight:600; }
+    /* แถบแท็บโหมด — ตรึงไว้บนสุดของกล่องเลื่อน จะได้สลับแท็บได้ตลอดโดยไม่ต้องเลื่อนกลับขึ้นไป */
+    .fx-modes{
+      position:sticky; top:0; z-index:6; background:#fff;
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      border-bottom:2px solid var(--line); padding:12px 14px 10px; margin:-12px -14px 14px;
+    }
+    .fx-mode{
+      background:#f3f4f6; border:1.5px solid #e5e7eb; border-radius:999px; padding:9px 20px;
+      font-family:inherit; font-size:15px; font-weight:500; color:#4b5563; cursor:pointer;
+      transition:background .12s, border-color .12s, color .12s, transform .1s;
+    }
+    .fx-mode:hover{ background:#ede9fe; border-color:#c4b5fd; color:var(--purple-dark); }
+    .fx-mode:active{ transform:scale(.97); }
+    .fx-mode.on{ background:linear-gradient(135deg,var(--purple),var(--purple-dark)); border-color:var(--purple-dark); color:#fff; box-shadow:0 3px 10px rgba(124,58,237,.35); }
     .fx-mode .fx-count{ background:#ea580c; }
-    .fx-mtabs{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
-    .fx-mtab{ background:#f3f4f6; border:1px solid transparent; border-radius:999px; padding:7px 16px; font-family:inherit; font-size:14px; color:#4b5563; cursor:pointer; }
-    .fx-mtab.on{ background:#faf5ff; border-color:#ddd6fe; color:var(--purple-dark); font-weight:600; }
+    .fx-mode.on .fx-count{ background:rgba(255,255,255,.28); }
+    /* แถบเลือกประเภทในโหมดแก้เอง — ตรึงใต้แถบแท็บ */
+    .fx-mtabs{
+      position:sticky; top:var(--fxtop,66px); z-index:5; background:#fff;
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+      padding:8px 14px 10px; margin:0 -14px 12px; border-bottom:1px solid var(--line);
+    }
+    .fx-mtab{
+      background:#f3f4f6; border:1.5px solid #e5e7eb; border-radius:999px; padding:8px 18px;
+      font-family:inherit; font-size:14px; font-weight:500; color:#4b5563; cursor:pointer; transition:background .12s, border-color .12s, transform .1s;
+    }
+    .fx-mtab:hover{ background:#ede9fe; border-color:#c4b5fd; }
+    .fx-mtab:active{ transform:scale(.97); }
+    .fx-mtab.on{ background:var(--purple); border-color:var(--purple-dark); color:#fff; font-weight:600; }
+    .fx-mtab.fx-only{ background:#fff7ed; border-color:#fdba74; color:#c2410c; }
+    .fx-mtab.fx-only.on{ background:#ea580c; border-color:#c2410c; color:#fff; }
+    .fx-mtab .fx-count{ background:#ea580c; }
+    .fx-mtab.on .fx-count{ background:rgba(255,255,255,.3); }
+    /* ไฮไลต์สถานะในรายการแก้เอง */
+    .fx-mitem.fx-s-pending{ background:#fef2f2; box-shadow:inset 3px 0 0 #dc2626; }
+    .fx-mitem.fx-s-suspect{ background:#fffbeb; box-shadow:inset 3px 0 0 #f59e0b; }
+    .fx-mitem.fx-s-decided{ background:#f0fdf4; box-shadow:inset 3px 0 0 #16a34a; }
+    .fx-snote{ font-size:12.5px; padding:2px 10px; border-radius:999px; }
+    .fx-n-pending{ background:#fee2e2; color:#b91c1c; }
+    .fx-n-suspect{ background:#fef3c7; color:#92400e; }
+    .fx-n-decided{ background:#dcfce7; color:#15803d; }
     .fx-msearch{ flex:1 1 200px; border:1px solid #d1d5db; border-radius:9px; padding:8px 12px; font-family:inherit; font-size:14px; }
     .fx-mlist{ max-height:340px; overflow-y:auto; border:1px solid var(--line); border-radius:12px; padding:6px; margin-bottom:12px; }
     .fx-mitem{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:8px 11px; border-radius:9px; cursor:pointer; font-size:14px; }
@@ -263,9 +297,22 @@
     .fx-mrow{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:9px; }
     .fx-mrow label{ font-size:13.5px; color:#4b5563; min-width:140px; }
     .fx-mrow input{ flex:1 1 200px; border:1px solid #d1d5db; border-radius:9px; padding:8px 11px; font-family:inherit; font-size:14px; }
-    .fx-top{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:2px 0 12px; }
-    .fx-sum{ font-size:15px; } .fx-sum b{ color:var(--purple-dark); font-size:17px; }
-    .fx-chip{ background:#f3f4f6; border-radius:999px; padding:3px 12px; font-size:13px; color:#4b5563; }
+    /* แถบสรุป + ชิปกรอง — ตรึงใต้แถบแท็บ กดกรองตามประเภทได้ */
+    .fx-top{
+      position:sticky; top:var(--fxtop,66px); z-index:5; background:#fff;
+      display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+      padding:8px 14px 10px; margin:0 -14px 12px; border-bottom:1px solid var(--line);
+    }
+    .fx-sum{ font-size:15px; margin-right:2px; } .fx-sum b{ color:var(--purple-dark); font-size:17px; }
+    .fx-chip{
+      background:#f3f4f6; border:1.5px solid #e5e7eb; border-radius:999px; padding:7px 15px;
+      font-family:inherit; font-size:13.5px; color:#4b5563; cursor:pointer; transition:background .12s, border-color .12s, transform .1s;
+    }
+    .fx-chip b{ color:var(--purple-dark); }
+    .fx-chip:hover{ background:#ede9fe; border-color:#c4b5fd; }
+    .fx-chip:active{ transform:scale(.97); }
+    .fx-chip.on{ background:var(--purple); border-color:var(--purple-dark); color:#fff; font-weight:600; }
+    .fx-chip.on b{ color:#fff; }
     .fx-who{ margin-left:auto; font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; }
     .fx-who input{ border:1px solid #d1d5db; border-radius:8px; padding:6px 10px; font-family:inherit; font-size:13px; width:150px; }
     .fx-card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:12px; }
