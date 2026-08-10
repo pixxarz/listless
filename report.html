@@ -35,6 +35,7 @@
       <div class="sub">โรงเรียนชานุมานวิทยาคม · ข้อมูลจากครูผู้สอน (ดูอย่างเดียว)</div>
     </div>
     <div class="acts">
+      <button class="btn btn-fix" id="fixBtn">🔍 ตรวจสอบข้อมูล <span class="fx-count" id="fixCount">0</span></button>
       <a class="btn btn-home" href="index.html">＋ กรอกฟอร์มใหม่</a>
       <button class="btn btn-out" id="outBtn">ออกจากระบบ</button>
     </div>
@@ -145,6 +146,18 @@
   </div>
 </div>
 
+<!-- Popup ตรวจสอบข้อมูลที่กรอกผิด (ชื่อ / ห้อง / วิชา) -->
+<div class="rm-backdrop" id="fixModal">
+  <div class="rm-box rm-wide">
+    <h3>ตรวจสอบข้อมูล</h3>
+    <div class="rm-scroll"><div id="fixBody"></div></div>
+    <div class="rm-foot">
+      <span class="fx-note">การแก้ไขมีผลกับหน้ารายงานเท่านั้น ข้อมูลต้นฉบับในชีตและเอกสารที่ปริ้นไม่ถูกแตะ</span>
+      <button type="button" class="rm-close" id="fixCloseBtn">ปิด</button>
+    </div>
+  </div>
+</div>
+
 <button type="button" class="main-top-btn" id="mainTopBtn" title="ขึ้นบนสุด" aria-label="ขึ้นบนสุด">↑</button>
 <div id="rtToast" class="rt-toast"></div>
 
@@ -152,6 +165,7 @@
      วางลอยไว้นอกกล่องเนื้อหา จึงเห็นได้ตั้งแต่หน้าใส่รหัสผ่าน ไม่ต้องล็อกอินก่อน -->
 <div class="ver-badge">เวอร์ชัน 1.1.0 · เผยแพร่ 10 สิงหาคม 2569</div>
 
+<script src="js/fixes.js"></script>
 <script src="js/report.js"></script>
 </body>
 </html>

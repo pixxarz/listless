@@ -22,8 +22,39 @@
     if(m){ var y=parseInt(m[1],10); if(y>=2400) return (y-543)+m[2]; }
     return v;
   }
+
+  // ===== ตรวจวันที่กับนาฬิกาจริงของเซิร์ฟเวอร์ =====
+  // timestamp เป็นเวลาที่ Google ประทับให้ตอนบันทึก (สร้างฝั่งเซิร์ฟเวอร์ ไม่ได้เอามาจากเครื่องครู)
+  // จึงเชื่อถือได้เสมอ ใช้เป็นนาฬิกาอ้างอิงจับ "วันที่กรอก" ที่เพี้ยนจากสาเหตุอื่นนอกจาก พ.ศ./ค.ศ.
+  // เช่น นาฬิกาในเครื่องครูตั้งผิดปี หรือครูเลือกปีผิดเอง
+  // เกณฑ์ 365 วัน: ครูกรอกย้อนหลังจริงแค่ระดับเดือน (ใบข้อมูลรอบ มิ.ย. มากรอก ส.ค.) จึงไม่โดนแตะ
+  var DATE_MAX_DIFF_DAYS=365;
+  function serverDateISO(ts){
+    var d=new Date(String(ts||'')); if(isNaN(d.getTime())) return '';
+    var t=new Date(d.getTime()+7*3600*1000); // ชีตเก็บเป็นเวลาสากล — บวก 7 ให้เป็นเวลาไทยก่อนตัดเอาวันที่
+    return t.toISOString().slice(0,10);
+  }
+  // ซ่อมวันที่ให้ตรงกับเวลาจริง แล้วติดธงไว้ (_dateFixed) เพื่อไปแสดงสัญลักษณ์เตือนในตาราง
+  // เก็บค่าเดิมไว้ที่ _dateRaw ด้วย จะได้บอกได้ว่าต้นทางเขียนมาว่าอะไร
+  function checkDateAgainstServer(r){
+    var srv=serverDateISO(r[COL.ts]); if(!srv) return;
+    var got=String(r[COL.date]||''); if(!/^\d{4}-\d{2}-\d{2}/.test(got)) return;
+    var diff=Math.abs(new Date(got.substr(0,10)+'T00:00:00Z').getTime()-new Date(srv+'T00:00:00Z').getTime())/86400000;
+    if(diff>DATE_MAX_DIFF_DAYS){ r._dateRaw=got; r[COL.date]=srv; r._dateFixed=true; }
+  }
+  // สัญลักษณ์เตือนท้ายวันที่ (ใช้ทั้งตารางหลักและป๊อปอัปใบรายงาน ให้หน้าตาเหมือนกัน)
+  function dateFixMark(raw){
+    return ' <span class="date-fixed" title="วันที่ต้นทางเขียนมาว่า '+esc(fmtDate(raw))+' ซึ่งห่างจากเวลาที่บันทึกเข้าระบบจริงมากผิดปกติ ระบบจึงแก้ให้ตรงกับเวลาจริงแล้ว">⚠</span>';
+  }
+
   function normalizeRows(rows){
-    (rows||[]).forEach(function(r){ r[COL.date]=beToCE(r[COL.date]); r[COL.ts]=beToCE(r[COL.ts]); });
+    (rows||[]).forEach(function(r){
+      r[COL.date]=beToCE(r[COL.date]); r[COL.ts]=beToCE(r[COL.ts]);
+      checkDateAgainstServer(r);
+    });
+    // เอาผลการตรวจสอบข้อมูล (ชื่อ/ห้อง/วิชา ที่คนยืนยันแล้ว) มาทับ
+    // ทำตรงนี้จุดเดียว ทุกส่วนของหน้ารายงานจึงเห็นค่าที่แก้แล้วตรงกันหมด
+    if(window.FIXES){ window.FIXES.setCol(COL); window.FIXES.apply(rows||[]); }
     return rows||[];
   }
 
@@ -143,8 +174,33 @@
       if(e.target.closest('.spin')){ onPinClick(sortState, k, col); } else { onSortClick(sortState, k, col); }
       updateArrows(); render();
     });
+    initFixPanel();
     render();
     startRealtime();   // เริ่มเช็ครายงานใหม่อัตโนมัติทุก ~45 วินาที
+  }
+
+  // ===== หน้าตรวจสอบข้อมูลที่กรอกผิด (ชื่อ / ห้อง / วิชา) =====
+  // ตัวตรวจจับและหน้าจออยู่ใน js/fixes.js — ตรงนี้แค่ต่อปุ่ม ป๊อปอัป และตัวเลขบนปุ่ม
+  function updateFixCount(){
+    var el=document.getElementById('fixCount'); if(!el || !window.FIXES) return;
+    var n=window.FIXES.detect(allRows).counts.pending;
+    el.textContent=n;
+    el.className='fx-count'+(n?'':' zero');
+  }
+  function initFixPanel(){
+    var btn=document.getElementById('fixBtn'), modal=document.getElementById('fixModal'), body=document.getElementById('fixBody');
+    if(!btn || !modal || !window.FIXES) return;
+    btn.addEventListener('click', function(){
+      window.FIXES.render(body, allRows, function(){
+        window.FIXES.apply(allRows);  // ตัดสินแล้วให้มีผลกับทั้งหน้าทันที
+        render(); updateFixCount();
+      });
+      modal.classList.add('show'); document.body.style.overflow='hidden';
+    });
+    document.getElementById('fixCloseBtn').addEventListener('click', function(){
+      modal.classList.remove('show'); document.body.style.overflow='';
+    });
+    updateFixCount();
   }
 
   function buildFilterOptions(){
@@ -260,6 +316,7 @@
     updateArrows();
     document.getElementById('cntShown').textContent=rows.length;
     document.getElementById('cntAll').textContent=allRows.length;
+    updateFixCount();   // มีใบใหม่เข้ามา อาจมีข้อมูลที่ต้องตรวจเพิ่ม
     syncStickyHead();
   }
   window.addEventListener('resize', syncStickyHead);
@@ -463,7 +520,8 @@
       var avg; if(ok && tp>0) avg=tm/tp*100; else { var pp=x.recs.map(function(r){ return num(r[COL.percent]); }).filter(function(v){ return v!=null; }); avg=pp.length?pp.reduce(function(a,b){return a+b;},0)/pp.length:null; }
       var subs=x.recs.slice().sort(function(a,b){ var sa=num(a[COL.seat]),sb=num(b[COL.seat]); if(sa!=null&&sb!=null&&sa!==sb) return sa-sb; return sName(a).localeCompare(sName(b),'th',{numeric:true}); })
         .map(function(r){ return [ sv(r[COL.seat]), sName(r), sv(r[COL.cls]), sv(r[COL.periods]), sv(r[COL.present]), sv(r[COL.absent]), pct(r), sv(r[COL.remark]) ]; });
-      return { ts:ts, date:x.date, teacher:x.teacher, subjectLabel:(x.subject||'(ไม่ระบุ)')+(x.code?' ('+x.code+')':''), count:x.recs.length, avgNum:avg, avgStr:(avg==null?'–':avg.toFixed(1)), sub:subs };
+      var fixed=x.recs.filter(function(r){ return r._dateFixed; })[0]; // ใบเดียวกันมาจากการกรอกครั้งเดียว วันที่จึงเหมือนกันทั้งใบ
+      return { ts:ts, date:x.date, teacher:x.teacher, subjectLabel:(x.subject||'(ไม่ระบุ)')+(x.code?' ('+x.code+')':''), count:x.recs.length, avgNum:avg, avgStr:(avg==null?'–':avg.toFixed(1)), sub:subs, dateFixed:!!fixed, dateRaw:(fixed?fixed._dateRaw:'') };
     });
   }
 
@@ -1018,7 +1076,7 @@
     reps.forEach(function(g,gi){
       var tsAttr=String(g.ts).replace(/"/g,'&quot;');
       eh+='<tr class="exp-main" data-gi="'+gi+'"><td class="exp-toggle"><span class="exp-arrow">▶</span></td>';
-      eh+='<td class="num" data-tip="กดเพื่อดู / ซ่อนรายชื่อนักเรียนในใบ">'+(gi+1)+'</td><td class="num">'+esc(fmtDate(g.date))+'</td><td class="num">'+esc(fmtTime(g.ts))+'</td><td>'+esc(g.teacher)+'</td><td>'+esc(g.subjectLabel)+'</td><td class="num">'+g.count+'</td><td class="num">'+esc(g.avgStr)+'</td>';
+      eh+='<td class="num" data-tip="กดเพื่อดู / ซ่อนรายชื่อนักเรียนในใบ">'+(gi+1)+'</td><td class="num">'+esc(fmtDate(g.date))+(g.dateFixed?dateFixMark(g.dateRaw):'')+'</td><td class="num">'+esc(fmtTime(g.ts))+'</td><td>'+esc(g.teacher)+'</td><td>'+esc(g.subjectLabel)+'</td><td class="num">'+g.count+'</td><td class="num">'+esc(g.avgStr)+'</td>';
       eh+='<td><button class="btn-pdf-row" data-ts="'+tsAttr+'">📄 PDF</button></td></tr>';
       eh+='<tr class="exp-sub" data-gi="'+gi+'" style="display:none"><td></td><td colspan="'+(cfg.headers.length+1)+'">';
       eh+='<table class="rm-subtable rm-sub-rep"><thead><tr>';
@@ -1214,7 +1272,7 @@
       var newGrp=(tsRaw!==prevTs); if(newGrp){ grpIdx++; prevTs=tsRaw; }
       var rowCls='rpt-'+(grpIdx%2)+(newGrp?' rpt-top':''); // แถวแรกของใบ = เส้นคั่นบน
       return '<tr class="'+rowCls+'">'+
-        '<td>'+esc(fmtDate(r[COL.date]||r[COL.ts]))+'</td>'+
+        '<td>'+esc(fmtDate(r[COL.date]||r[COL.ts]))+(r._dateFixed?dateFixMark(r._dateRaw):'')+'</td>'+
         '<td>'+esc((r[COL.tPrefix]||'')+r[COL.tName])+'</td>'+
         '<td>'+esc(r[COL.subject])+'<div style="font-size:12px;color:#9ca3af">'+esc(r[COL.code])+'</div></td>'+
         '<td style="text-align:center">'+esc(r[COL.seat])+'</td>'+
