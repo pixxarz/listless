@@ -12,6 +12,21 @@
   var allRows=[];
   var currentPass='', pollTimer=null, polling=false, seenTs={};
 
+  // ===== แก้ปีเพี้ยน: บางเครื่องของครูส่งวันที่มาเป็น พ.ศ. (2569-08-10) แทน ค.ศ. =====
+  // ทั้งเว็บคิดบนสมมติฐานว่าวันที่จากชีตเป็น ค.ศ. เสมอ แล้วค่อย +543 ตอนแสดงผล
+  // ค่าที่เป็น พ.ศ. อยู่แล้วจึงโดนบวกซ้ำเป็น 3112 (2569+543) ทั้งบนตาราง เอกสาร PDF และ CSV
+  // แก้ที่ประตูทางเข้าจุดเดียว = ดึงข้อมูลมาแล้วแปลงเป็น ค.ศ. ทันที ทุกจุดปลายทางถูกตามอัตโนมัติ
+  // (ปี >= 2400 = เป็น พ.ศ. แน่นอน เพราะ ค.ศ. จะไปถึงเลขนั้นอีก 400 ปี)
+  function beToCE(v){
+    var m=String(v==null?'':v).match(/^(\d{4})(-\d{2}-\d{2}.*)$/);
+    if(m){ var y=parseInt(m[1],10); if(y>=2400) return (y-543)+m[2]; }
+    return v;
+  }
+  function normalizeRows(rows){
+    (rows||[]).forEach(function(r){ r[COL.date]=beToCE(r[COL.date]); r[COL.ts]=beToCE(r[COL.ts]); });
+    return rows||[];
+  }
+
   // หน่วงการเรียกฟังก์ชัน — รอหยุดพิมพ์ครบ ms มิลลิวินาทีค่อยทำงาน (กันสร้างตารางใหม่ทุกตัวอักษรตอนค้นหา = ลื่นขึ้นเมื่อข้อมูลเยอะ)
   function debounce(fn, ms){ var t; return function(){ var args=arguments, ctx=this; clearTimeout(t); t=setTimeout(function(){ fn.apply(ctx, args); }, ms||200); }; }
 
@@ -32,7 +47,7 @@
     jsonp({ key:currentPass }, function(data){
       polling=false;
       if(!data || data.result!=='OK' || !data.rows) return;
-      var rows=data.rows, newTs={}, cnt=0;
+      var rows=normalizeRows(data.rows), newTs={}, cnt=0;
       rows.forEach(function(r){ var t=String(r[COL.ts]||''); if(t && !seenTs[t] && !newTs[t]){ newTs[t]=1; cnt++; } });
       if(cnt>0){
         allRows=rows;
@@ -65,7 +80,7 @@
   function tryLogin(pass, onFail){
     jsonp({ key:pass }, function(data){
       if(data && data.result==='OK'){
-        allRows=data.rows||[];
+        allRows=normalizeRows(data.rows||[]);
         currentPass=pass;   // เก็บใน memory (หายเมื่อปิด/รีเฟรชหน้า) เพื่อใช้เช็ครายงานใหม่อัตโนมัติ
         gate.classList.add('hidden'); main.classList.remove('hidden');
         initApp();

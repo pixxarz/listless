@@ -239,6 +239,12 @@
     .btn-pdf-row:hover{ filter:brightness(1.08); }
 
     /* ===== Loading / gate ===== */
+    /* ป้ายเวอร์ชันมุมซ้ายล่าง — z-index สูงกว่าหน้ารหัสผ่าน (300) จึงเห็นได้ทั้งก่อนและหลังล็อกอิน */
+    .ver-badge{
+      position:fixed; left:12px; bottom:12px; z-index:400;
+      background:rgba(255,255,255,.85); border:1px solid var(--line); border-radius:8px;
+      padding:4px 11px; font-size:12px; color:var(--muted); letter-spacing:.2px; pointer-events:none;
+    }
     .gate{ position:fixed; inset:0; background:linear-gradient(135deg,#7c3aed,#db2777); display:flex; align-items:center; justify-content:center; z-index:300; padding:20px; }
     .gate-box{ background:#fff; border-radius:20px; padding:34px 30px; width:100%; max-width:380px; text-align:center; box-shadow:0 20px 60px rgba(0,0,0,.3); }
     .gate-box img{ height:64px; margin-bottom:14px; }
@@ -302,7 +308,7 @@
       body{ background:#fff !important; padding:0 !important; }
       /* บังคับพิมพ์สีพื้นหลัง (แถบสีหัวตาราง/แถวนักเรียน/หัวชั้น) ไม่ให้เบราว์เซอร์ตัดทิ้งตอนพิมพ์ */
       .doc-paper, .doc-paper *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-      .wrap,.float-print,.float-close,.print-hint,.rm-backdrop{ display:none !important; }
+      .wrap,.float-print,.float-close,.print-hint,.rm-backdrop,.ver-badge{ display:none !important; }
       .pdf-backdrop{ position:static !important; display:block !important; background:none !important; padding:0 !important; overflow:visible !important; }
       .doc-paper{ position:static !important; box-shadow:none !important; border-radius:0 !important; width:100% !important; max-width:none !important; min-height:0 !important; padding:0 !important; }
       .od-table{ page-break-inside:auto; }

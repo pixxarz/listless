@@ -42,6 +42,8 @@ Each page = `*.html` (markup) + `css/*.css` (styles, incl. `@font-face` and the 
 | Function | Purpose |
 |---|---|
 | `addRow()` | Builds a student table row entirely in JS (no HTML template); auto-calcs absent hrs + %; class `ม.[level]/[room]` input auto-advances after 1 digit |
+| Thai date picker | `buildDateSelectors()` fills day/month/year selects (`#dateDay/#dateMonth/#dateYear`, years = current BE +1 → −3); `fillDayOptions()` rebuilds days per month and clamps an out-of-range day (31 Jan → Feb = 28/29); `syncDateValue()` writes **CE** `YYYY-MM-DD` into hidden `#dateInput`; `setDateToday()` (also on the "วันนี้" button and after `resetForm()`) reads `new Date()`, which is always CE regardless of the machine's calendar. See the BE/CE gotcha below — this replaced `<input type="date">` on purpose |
+| Draft autosave | `saveDraftSoon()` (debounced 400 ms on any form input/change/add-row/delete-row) → `saveDraft()` stores `collectData()` + `savedAt` in `localStorage['chanu_attendance_draft_v1']`, but only when `draftHasContent()`. `askRestoreDraft()` runs after the intro popup closes and offers restore/discard; `restoreDraft()` refills every field, rebuilds rows via `addRow()` + `fillRowFromDraft()` (re-fires `input`/`change` so absent/% and the remark textarea behave as if typed), and sets `formDirty=true`. Cleared on verified save, on `doNewForm()`, and on discard. All `localStorage` access is wrapped in try/catch (private mode / quota) |
 | `collectData()` | Reads form fields + table rows into a plain object |
 | `validate(d)` | Returns error strings, marks invalid fields red; blocks seat-number duplicates and students at/above 70% |
 | `markSeatDups()` | Real-time duplicate-seat highlighting while typing |
@@ -54,6 +56,7 @@ Each page = `*.html` (markup) + `css/*.css` (styles, incl. `@font-face` and the 
 ### report.html — dashboard
 
 - **Password gate:** JSONP `doGet(?key=...)`; server validates before returning data.
+- **`normalizeRows()`** runs on every fetch (login + realtime poll) before anything else touches the data: `beToCE()` converts a leading year ≥ 2400 in `วันที่กรอก`/`timestamp` from BE to CE. One gate, so table/sort/filter/PDF/CSV are all fixed at once — see the BE/CE gotcha below.
 - **`allRows`** holds every Sheet row (one per student). Grouping helpers rebuild higher-level views:
   - `buildStudentGroups` (per student, with subjects sub-rows + overall % from total present/total periods), `buildReportGroups` (per submission timestamp), `buildTeacherGroups`, `buildSubjectGroups`.
 - **KPI cards** open detail modals via `openCardModal(type)`; the student card (`renderStudentTable`) has its own filter bar + expandable rows. It uses **virtual scrolling** — `renderWindow()` renders only the ~visible rows plus top/bottom spacer `<tr>`s (height = off-screen rows × measured `ROW_H`), recomputed on scroll via rAF; expanded-row sub-table heights are cached in `subH`. Sub-tables are also **lazy** (built only when a row is expanded). Both shrink the popup DOM (137+ students × nested per-subject tables would be thousands of nodes). The other card renders (`renderReportTable`/`renderTeacherTable`/`renderSubjectCardTable`) still build all rows at once — only the student card was hot enough to virtualize.
@@ -85,7 +88,7 @@ report.html --GET key=pass (JSONP)-> Code.gs doGet  --> readSheet --> allRows  (
 
 ## Key Constants
 
-- `index.html`: `THRESHOLD = 70`, `MIN_DOC_ROWS = 10`, `PREFIX_OPTIONS`, `REMARK_OPTIONS`
+- `index.html`: `THRESHOLD = 70`, `MIN_DOC_ROWS = 10`, `PREFIX_OPTIONS`, `REMARK_OPTIONS`, `DRAFT_KEY = 'chanu_attendance_draft_v1'`
 - `report.html`: `SHEET_URL`, `THRESHOLD = 70`, `MIN_DOC_ROWS = 10`, `COL` (Sheet column-name map)
 - `Code.gs`: `DEFAULT_REPORT_PASSWORD` (override with Script Property `REPORT_PASSWORD`)
 
@@ -107,6 +110,7 @@ report.html --GET key=pass (JSONP)-> Code.gs doGet  --> readSheet --> allRows  (
 - **Print color:** `@media print` sets `print-color-adjust:exact` on `.doc-paper *` so header/grade band colors survive printing.
 - **Mobile table:** `.table-wrap` gets `overflow-x:auto` only under `@media (max-width:720px)` — doing it globally would turn `overflow-y` to `auto` and break the sticky form header on desktop.
 - **`buildDoc`/`fitNames`/`thaiDate` are NOT shared** — `js/index.js` and `js/report.js` each keep their own copy and they genuinely differ: `index` embeds the logo as base64 + uses form-shaped data; `report` uses `logo.png` + grouped data + the +7 timezone fix. They were checked during the split and deliberately left separate — do not try to merge them into a shared file.
-- **No version numbering** — do not bump or invent versions.
+- **BE vs CE years (the 3112 bug):** the Sheet stores `วันที่กรอก` as **CE** and every display path adds 543. Some teachers' machines are set to the Buddhist calendar, and `<input type="date">` there emitted **BE** (`2569-08-08`), which then got +543 → **3112** on screen, in the sort order, in the printed A4 document, and in the CSV. 34 of 174 rows in the Sheet are still stored that way (4 teachers, 5 submissions) — the Sheet was left untouched. Defence is three-deep: (1) `index.html` no longer uses `<input type="date">` at all — the Thai day/month/year selects always write CE; (2) `beToCE()` in `js/index.js` still guards `collectData()`; (3) `normalizeRows()` in `js/report.js` fixes anything already stored. **Never re-introduce a native date input here**, and keep the "year ≥ 2400 means BE" rule if you touch either helper.
+- **Version label** — shown in two places, kept in sync by hand: `index.html` footer (`.doc-version`) and `report.html` (`.ver-badge`, fixed bottom-left, above the password gate so it can be read without logging in, hidden in `@media print`). It exists so the school can confirm Netlify actually deployed — update the version **and the release date** in both files whenever you push a user-visible change. (Earlier versions of this project had no version numbering; that rule no longer applies.)
 - **UI text contains no `?` character** (project convention) and uses Thai with English in parentheses for technical terms.
 - **Popup paint-freeze on some machines (environmental, NOT a code bug):** a few Chromium setups — seen on an AMD-GPU + Windows 11 laptop with stale drivers — freeze ~20s when opening a large popup. Telltales: only Chrome/Edge (Firefox/Opera fine), main thread stays responsive (JS/longtask measured tiny), freeze disappears with DevTools open, not reproducible on a clean machine / the deployed site on another PC, and it persists through every code-level mitigation (D3D11/D3D9/WARP backends, disabling HW accel, incognito, virtual scroll). It is a browser/GPU-driver compositor issue. The virtual-scroll + lazy sub-tables above are kept as a DOM-size mitigation, but **do not keep chasing this freeze in the code** — point the user to update Windows/GPU drivers or use Firefox.

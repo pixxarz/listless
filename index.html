@@ -31,8 +31,18 @@
 
     <div class="field-row">
       <label class="lead">วันที่กรอกแบบฟอร์มรายงาน</label>
-      <input type="date" id="dateInput" />
-      <span class="hint">* เลือกวันที่ที่กรอกรายงานนี้</span>
+      <!-- ช่องวันที่แบบไทย: เลือก วัน/เดือน/ปี พ.ศ. เอง ไม่ใช้ input type=date
+           เพราะช่องปฏิทินของเบราว์เซอร์แสดง/คายค่าตามปฏิทินที่เครื่องตั้งไว้
+           เครื่องที่ตั้งเป็นพุทธศักราชจะส่งค่าเป็น พ.ศ. ทำให้ปีเพี้ยนเป็น 3112 (2569+543)
+           ชุดนี้คุมเองทั้งหมด: จอแสดง พ.ศ. เสมอ · ค่าที่เก็บลง #dateInput เป็น ค.ศ. เสมอ -->
+      <div class="date-th" id="dateTh">
+        <select id="dateDay" class="w-dd" aria-label="วันที่"></select>
+        <select id="dateMonth" class="w-dm" aria-label="เดือน"></select>
+        <select id="dateYear" class="w-dy" aria-label="ปีพุทธศักราช"></select>
+        <button type="button" class="btn-today" id="dateTodayBtn">วันนี้</button>
+      </div>
+      <input type="hidden" id="dateInput" />
+      <span class="note-inline">ระบบใส่วันที่ของวันนี้ให้แล้ว กดเปลี่ยนได้ถ้าต้องการ</span>
     </div>
 
     <div class="field-row">
@@ -148,6 +158,8 @@
     <div class="strong">กลุ่มบริหารวิชาการ โรงเรียนชานุมานวิทยาคม</div>
     <div>© 2026 กลุ่มบริหารวิชาการ</div>
     <div>โรงเรียนชานุมานวิทยาคม | <a href="https://www.chanu.ac.th/" target="_blank" rel="noopener">www.chanu.ac.th</a> | 093-414-5385</div>
+    <!-- เลขเวอร์ชัน + วันเผยแพร่ ไว้ตรวจว่าเว็บจริงอัปเดตเป็นตัวล่าสุดแล้วหรือยัง -->
+    <div class="doc-version">เวอร์ชัน 1.1.0 · เผยแพร่ 10 สิงหาคม 2569</div>
   </div>
 </div>
 
@@ -170,6 +182,19 @@
     <div class="alert-title" id="alertTitle">แจ้งเตือน</div>
     <div class="alert-msg" id="alertMsg"></div>
     <button type="button" class="alert-btn" id="alertBtn">รับทราบ</button>
+  </div>
+</div>
+
+<!-- Popup ถามตอนเปิดหน้า: เจอข้อมูลที่กรอกค้างไว้ (ร่างที่เก็บในเครื่อง) -->
+<div class="review-backdrop" id="draftModal">
+  <div class="review-box" style="max-width:480px">
+    <h2 style="text-align:center">พบข้อมูลที่กรอกค้างไว้</h2>
+    <div class="review-sub" style="text-align:center">ระบบเก็บข้อมูลที่กรอกไว้ก่อนหน้านี้ให้ ต้องการดึงกลับมากรอกต่อหรือเริ่มใบใหม่</div>
+    <div class="draft-info" id="draftInfo"></div>
+    <div class="review-actions" style="justify-content:center">
+      <button type="button" class="rev-back" id="draftDiscardBtn">เริ่มใบใหม่</button>
+      <button type="button" class="rev-confirm" id="draftRestoreBtn">ดึงข้อมูลกลับมา</button>
+    </div>
   </div>
 </div>
 

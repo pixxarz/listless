@@ -9,6 +9,52 @@
   var THAI_MONTHS = ['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
     'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
+  // ===== ช่องวันที่แบบไทย: เลือก วัน / เดือน / ปี พ.ศ. เอง =====
+  // ไม่ใช้ input type=date เพราะช่องปฏิทินของเบราว์เซอร์แสดงและคายค่าตามปฏิทินที่เครื่องตั้งไว้
+  // เครื่องที่ตั้งเป็นพุทธศักราชจะส่งค่าออกมาเป็น พ.ศ. แล้วโดนบวก 543 ซ้ำ กลายเป็นปี 3112
+  // ชุดนี้คุมเองทั้งหมด → จอแสดง พ.ศ. เหมือนกันทุกเครื่อง · ค่าที่เก็บลง #dateInput เป็น ค.ศ. เสมอ
+  var dDay=document.getElementById('dateDay'), dMonth=document.getElementById('dateMonth'), dYear=document.getElementById('dateYear');
+
+  // จำนวนวันของเดือนนั้น (วันที่ 0 ของเดือนถัดไป = วันสุดท้ายของเดือนนี้ · รองรับปีอธิกสุรทินอัตโนมัติ)
+  function daysInMonth(beYear, month){ return new Date(beYear-543, month, 0).getDate(); }
+
+  // สร้างตัวเลือกวันตามเดือน/ปีที่เลือกอยู่ — ถ้าวันเดิมเกิน (เช่น 31 แล้วเปลี่ยนไปเดือน ก.พ.) จะถอยลงมาให้เอง
+  function fillDayOptions(){
+    var max=daysInMonth(+dYear.value, +dMonth.value), cur=+dDay.value||1, h='';
+    for(var i=1;i<=max;i++) h+='<option value="'+i+'">'+i+'</option>';
+    dDay.innerHTML=h;
+    dDay.value=String(Math.min(cur, max));
+  }
+
+  // เขียนค่าจริงลงช่องซ่อน เป็น ค.ศ. รูปแบบ ปปปป-ดด-วว (รูปแบบเดียวกับที่ระบบเดิมใช้ทั้งหมด)
+  function syncDateValue(){
+    var el=document.getElementById('dateInput');
+    var d=+dDay.value, m=+dMonth.value, by=+dYear.value;
+    el.value=(d&&m&&by) ? ((by-543)+'-'+('0'+m).slice(-2)+'-'+('0'+d).slice(-2)) : '';
+  }
+
+  function setDateToday(){
+    var now=new Date();   // new Date() คืนปี ค.ศ. เสมอ ไม่ขึ้นกับปฏิทินที่เครื่องตั้งไว้
+    dYear.value=String(now.getFullYear()+543);
+    dMonth.value=String(now.getMonth()+1);
+    fillDayOptions();
+    dDay.value=String(now.getDate());
+    syncDateValue();
+  }
+
+  (function buildDateSelectors(){
+    var nowBE=new Date().getFullYear()+543, h='';
+    for(var y=nowBE+1; y>=nowBE-3; y--) h+='<option value="'+y+'">'+y+'</option>';
+    dYear.innerHTML=h;
+    h=''; for(var m=1;m<=12;m++) h+='<option value="'+m+'">'+THAI_MONTHS[m]+'</option>';
+    dMonth.innerHTML=h;
+    setDateToday();
+    dMonth.addEventListener('change', function(){ fillDayOptions(); syncDateValue(); });
+    dYear.addEventListener('change', function(){ fillDayOptions(); syncDateValue(); });
+    dDay.addEventListener('change', syncDateValue);
+    document.getElementById('dateTodayBtn').addEventListener('click', function(){ setDateToday(); markUnsaved(); });
+  })();
+
   (function fillYears() {
     var sel = document.getElementById('academicYear');
     var nowBE = new Date().getFullYear() + 543;
@@ -221,6 +267,16 @@
     if(el) el.addEventListener('input', function(){ this.value=this.value.replace(/\s+/g,''); });
   });
 
+  // ===== กันปีเพี้ยน: เครื่องบางเครื่อง (ตั้งปฏิทินเป็นพุทธศักราช) ส่งค่าช่องวันที่ออกมาเป็น พ.ศ. =====
+  // ทั้งระบบตกลงกันว่าวันที่ที่เก็บลงชีตเป็น ค.ศ. เสมอ แล้วค่อย +543 ตอนแสดงผล
+  // ค่าที่เป็น พ.ศ. อยู่แล้วจึงโดนบวกซ้ำกลายเป็น 3112 (2569+543) ทั้งบนหน้ารายงานและเอกสารที่ปริ้น
+  // จึงแปลงกลับเป็น ค.ศ. ตั้งแต่ตอนเก็บค่าจากฟอร์ม (ปี >= 2400 = เป็น พ.ศ. แน่นอน)
+  function beToCE(v){
+    var m=String(v==null?'':v).match(/^(\d{4})(-\d{2}-\d{2}.*)$/);
+    if(m){ var y=parseInt(m[1],10); if(y>=2400) return (y-543)+m[2]; }
+    return v;
+  }
+
   function buildCls(lv, rm) { return lv||rm ? 'ม.'+(lv||'')+(rm?'/'+rm:'') : ''; }
   function getRemark(tr) {
     var sel = tr.querySelector('[data-field=remarkSel]');
@@ -242,7 +298,7 @@
     var fn=document.getElementById('teacherFirstName').value.trim();
     var ln=document.getElementById('teacherLastName').value.trim();
     return {
-      dateInput:document.getElementById('dateInput').value,
+      dateInput:beToCE(document.getElementById('dateInput').value),
       teacherPrefix:document.getElementById('teacherPrefix').value,
       teacherFirstName:fn, teacherLastName:ln, teacherName:(fn+' '+ln).trim(),
       subjectGroup:document.getElementById('subjectGroup').value,
@@ -273,7 +329,7 @@
   }
   function validate(d) {
     clearInvalid(); var errs=[], mark=function(id){var e=document.getElementById(id);if(e)e.classList.add('invalid');};
-    if(!d.dateInput){errs.push('วันที่');mark('dateInput');}
+    if(!d.dateInput){errs.push('วันที่');['dateDay','dateMonth','dateYear'].forEach(mark);} // ช่องซ่อนขึ้นกรอบแดงไม่ได้ — ทำเครื่องหมายที่ช่องเลือกทั้ง 3 แทน
     if(!d.teacherFirstName){errs.push('ชื่อครู');mark('teacherFirstName');}
     if(!d.teacherLastName){errs.push('นามสกุลครู');mark('teacherLastName');}
     if(!d.subjectGroup){errs.push('กลุ่มสาระ');mark('subjectGroup');}
@@ -437,6 +493,7 @@
       if(saveCancelled) return; // ผู้ใช้กดยกเลิกไปแล้ว ไม่ต้องเด้งผลกลับ
       if(data && data.result==='OK' && data.saved>0){
         setSaved(true);
+        clearDraft(); // ยืนยันแล้วว่าข้อมูลเข้าชีตจริง — ร่างในเครื่องไม่จำเป็นอีก
         showSaveDone('บันทึกสำเร็จ', 'บันทึกข้อมูล '+data.saved+' รายการ ลง Google Sheet เรียบร้อยแล้ว');
       } else if(data && data.result==='OK' && data.saved===0){
         closeSuccess();
@@ -484,21 +541,134 @@
   document.getElementById('successNewBtn').addEventListener('click', function(){ closeSuccess(); doNewForm(); showToast('เริ่มกรอกใบใหม่ได้เลย','ok'); });
 
   // ===== กรอกใบใหม่ =====
-  function resetForm(){ document.getElementById('attendanceForm').reset(); studentBody.innerHTML=''; addRow(); formDirty=false; }
+  function resetForm(){ document.getElementById('attendanceForm').reset(); setDateToday(); studentBody.innerHTML=''; addRow(); formDirty=false; } // reset() ล้างช่องวันที่ด้วย — เติมวันนี้กลับให้ทันที
   function doNewForm(){
     resetForm();
     SUBMISSION_ID='S'+Date.now()+'_'+Math.floor(Math.random()*1000000000); // รหัสใหม่ = ใบใหม่ ไม่ทับของเก่า
     setSaved(false);
+    clearDraft(); // เริ่มใบใหม่ = ทิ้งร่างเดิม ไม่ให้เด้งถามอีกตอนเปิดหน้าครั้งหน้า
   }
   document.getElementById('newFormBtn').addEventListener('click', function(){
     doNewForm();
     showToast('ล้างฟอร์มแล้ว เริ่มกรอกใบใหม่ได้เลย','ok');
   });
 
+  // ===== เก็บร่างอัตโนมัติไว้ในเครื่อง =====
+  // กันข้อมูลหายตอนเผลอรีเฟรช ปิดแท็บ ไฟดับ เน็ตหลุด หรือสลับแอปบนมือถือแล้วหน้าเว็บโดนเคลียร์
+  // เก็บในเครื่องของครูเองเท่านั้น ไม่ส่งขึ้นชีต · ล้างทิ้งเมื่อบันทึกสำเร็จ หรือกดเริ่มใบใหม่
+  var DRAFT_KEY='chanu_attendance_draft_v1', draftTimer=null;
+  function draftStore(){ try{ return window.localStorage; }catch(e){ return null; } } // บางเครื่อง/โหมดไม่ระบุตัวตนปิดที่เก็บข้อมูลไว้
+  // ร่างที่ "มีเนื้อหาจริง" เท่านั้นถึงคุ้มเก็บ — ฟอร์มเปล่าไม่ต้องถามกวนตอนเปิดหน้า
+  function draftHasContent(d){
+    if(!d) return false;
+    if((d.teacherFirstName||'').trim() || (d.subjectName||'').trim() || (d.subjectCode||'').trim()) return true;
+    return (d.students||[]).some(function(s){ return (s.name||'').trim() || String(s.periods||'')!=='' || String(s.present||'')!==''; });
+  }
+  function saveDraft(){
+    var st=draftStore(); if(!st) return;
+    var d=collectData();
+    if(!draftHasContent(d)){ clearDraft(); return; }
+    d.savedAt=new Date().toISOString();
+    try{ st.setItem(DRAFT_KEY, JSON.stringify(d)); }catch(e){} // พื้นที่เต็ม/ถูกปิด = ข้ามไปเงียบๆ ห้ามให้กระทบการกรอก
+  }
+  function saveDraftSoon(){ clearTimeout(draftTimer); draftTimer=setTimeout(saveDraft, 400); } // รอหยุดพิมพ์ 0.4 วิ ค่อยเก็บ (ไม่เก็บทุกตัวอักษร)
+  function clearDraft(){ var st=draftStore(); if(!st) return; try{ st.removeItem(DRAFT_KEY); }catch(e){} }
+  function readDraft(){
+    var st=draftStore(); if(!st) return null;
+    try{ var raw=st.getItem(DRAFT_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+  }
+
+  // ตั้งช่องวันที่จากค่า ค.ศ. ที่เก็บไว้ — ถ้าปีอยู่นอกช่วงตัวเลือก (ร่างเก่าข้ามปี) ให้ใช้วันนี้แทน
+  function setDateFromISO(iso){
+    var p=String(iso||'').split('-');
+    if(p.length!==3){ setDateToday(); return; }
+    dYear.value=String(parseInt(p[0],10)+543);
+    if(dYear.selectedIndex<0){ setDateToday(); return; }
+    dMonth.value=String(parseInt(p[1],10));
+    fillDayOptions();
+    dDay.value=String(parseInt(p[2],10));
+    syncDateValue();
+  }
+
+  // เติมข้อมูลนักเรียน 1 คน กลับเข้าแถวที่เพิ่งสร้าง
+  function fillRowFromDraft(tr, s){
+    var set=function(f,v){ var e=tr.querySelector('[data-field="'+f+'"]'); if(e) e.value=(v==null?'':v); };
+    var c=String(s.classroom||'').replace('ม.','').split('/');
+    set('seat', (s.seat===''||s.seat==null)?'–':s.seat);
+    if(s.prefix) set('prefix', s.prefix);
+    set('name', s.name);
+    set('level', (c[0]||'').trim());
+    set('room', (c[1]||'').trim());
+    set('periods', s.periods);
+    set('present', s.present);
+    var sel=tr.querySelector('[data-field=remarkSel]'), txt=tr.querySelector('[data-field=remark]');
+    if(sel){
+      if(s.remark==='ขาดเรียนนาน') sel.value='ขาดเรียนนาน';
+      else if(String(s.remark||'').trim()) sel.value='อื่นๆ (กรอกเอง)';
+      sel.dispatchEvent(new Event('change')); // ให้ช่องกรอกเองโผล่/สีแดงของ "ขาดเรียนนาน" ทำงานเหมือนตอนครูเลือกเอง
+      if(txt && sel.value==='อื่นๆ (กรอกเอง)') txt.value=s.remark;
+    }
+    var per=tr.querySelector('[data-field=periods]');
+    if(per) per.dispatchEvent(new Event('input')); // คิดคาบขาด + % ใหม่จากตัวเลขที่เติมกลับ
+  }
+
+  function restoreDraft(d){
+    var g=function(id,v){ var e=document.getElementById(id); if(e) e.value=(v==null?'':v); };
+    setDateFromISO(d.dateInput);
+    if(d.teacherPrefix) g('teacherPrefix', d.teacherPrefix);
+    g('teacherFirstName', d.teacherFirstName); g('teacherLastName', d.teacherLastName);
+    g('subjectGroup', d.subjectGroup); g('subjectCode', d.subjectCode); g('subjectName', d.subjectName);
+    g('credits', d.credits); g('hoursPerWeek', d.hoursPerWeek);
+    g('semester', d.semester); g('academicYear', d.academicYear);
+    studentBody.innerHTML='';
+    var list=(d.students||[]).filter(function(s){ return s && (s.name||s.periods||s.present||s.classroom||(s.seat&&s.seat!=='–')); });
+    if(!list.length) list=[{}];
+    list.forEach(function(s){ addRow(); fillRowFromDraft(studentBody.lastElementChild, s); });
+    renumber(); markSeatDups();
+    setSaved(false);
+    formDirty=true; // ยังไม่ได้บันทึกลงระบบ — ต้องเตือนถ้าจะออกจากหน้า
+  }
+
+  // ข้อความสรุปในป๊อปอัป ให้ครูรู้ว่าร่างนี้คือใบอะไร ของเมื่อไหร่
+  function draftSummary(d){
+    var w=new Date(d.savedAt), when='';
+    if(!isNaN(w.getTime())){
+      when='บันทึกไว้เมื่อ '+w.getDate()+' '+(THAI_MONTHS[w.getMonth()+1]||'')+' '+(w.getFullYear()+543)+
+        ' เวลา '+('0'+w.getHours()).slice(-2)+':'+('0'+w.getMinutes()).slice(-2)+' น.';
+    }
+    var stu=(d.students||[]).filter(function(s){ return (s.name||'').trim(); }).length;
+    var teacher=((d.teacherPrefix||'')+(d.teacherFirstName||'')+' '+(d.teacherLastName||'')).trim();
+    var parts=[];
+    if(teacher) parts.push('ครูผู้สอน <b>'+esc(teacher)+'</b>');
+    if(String(d.subjectName||'').trim()) parts.push('รายวิชา <b>'+esc(d.subjectName)+(d.subjectCode?' ('+esc(d.subjectCode)+')':'')+'</b>');
+    parts.push('รายชื่อนักเรียน <b>'+stu+'</b> คน');
+    return '<span class="when">'+esc(when)+'</span>'+parts.join(' · ');
+  }
+
+  // ถามตอนเปิดหน้า (เรียกหลังปิดคำชี้แจง) — ป๊อปอัปในแอป ไม่ใช่กล่องเด้งของเบราว์เซอร์
+  var draftModal=document.getElementById('draftModal');
+  function askRestoreDraft(){
+    var d=readDraft();
+    if(!draftHasContent(d)) return;
+    document.getElementById('draftInfo').innerHTML=draftSummary(d);
+    draftModal.classList.add('show'); document.body.style.overflow='hidden';
+    var close=function(){ draftModal.classList.remove('show'); document.body.style.overflow=''; };
+    document.getElementById('draftRestoreBtn').onclick=function(){ close(); restoreDraft(d); showToast('ดึงข้อมูลที่กรอกค้างไว้กลับมาแล้ว','ok'); };
+    document.getElementById('draftDiscardBtn').onclick=function(){ close(); clearDraft(); showToast('เริ่มกรอกใบใหม่ได้เลย','ok'); };
+  }
+
+  // เก็บร่างทุกครั้งที่มีการแก้ข้อมูล (พิมพ์ / เลือก / เพิ่มแถว / ลบแถว)
+  document.getElementById('attendanceForm').addEventListener('input', saveDraftSoon);
+  document.getElementById('attendanceForm').addEventListener('change', saveDraftSoon);
+  document.getElementById('addRowBtn').addEventListener('click', saveDraftSoon);
+  document.getElementById('delConfirmBtn').addEventListener('click', saveDraftSoon);
+  document.getElementById('dateTodayBtn').addEventListener('click', saveDraftSoon);
+
   // ปิด popup คำชี้แจง → เริ่มใช้งานเว็บ (แสดงทุกครั้งที่เปิดเว็บ)
   document.getElementById('introOkBtn').addEventListener('click', function(){
     document.getElementById('introGate').classList.add('hidden');
     document.body.style.overflow=''; // ปลดล็อกการเลื่อนหน้า
+    askRestoreDraft();               // ปิดคำชี้แจงแล้วค่อยถามเรื่องร่างที่ค้างไว้ (ไม่ให้ป๊อปอัปซ้อนกัน)
   });
   document.body.style.overflow='hidden'; // ล็อกการเลื่อนขณะ popup คำชี้แจงแสดง
 
