@@ -315,6 +315,16 @@
     .fx-chip.on b{ color:#fff; }
     .fx-who{ margin-left:auto; font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px; }
     .fx-who input{ border:1px solid #d1d5db; border-radius:8px; padding:6px 10px; font-family:inherit; font-size:13px; width:150px; }
+    /* แถบสถานะการบันทึกลงชีต — ขึ้นบรรทัดเต็มความกว้างใต้ปุ่มโหมด (แถบแม่เป็น flex-wrap) */
+    .fx-syncwrap{ flex:1 1 100%; }
+    .fx-syncwrap:empty{ display:none; }   /* ยังไม่ได้ต่อกับหลังบ้าน = ไม่ต้องเว้นที่ว่างไว้ */
+    .fx-sync{ font-size:13px; border-radius:9px; padding:7px 12px; display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+    .fx-sync-idle{ color:var(--muted); padding:2px 0; }
+    .fx-sync-busy{ background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
+    .fx-sync-ok{ background:#ecfdf5; border:1px solid #a7f3d0; color:#15803d; }
+    .fx-sync-bad{ background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; }
+    .fx-retry{ background:#dc2626; border:none; border-radius:999px; padding:5px 14px; font-family:inherit; font-size:13px; color:#fff; cursor:pointer; }
+    .fx-retry:hover{ filter:brightness(1.08); }
     .fx-card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:12px; }
     .fx-card.fx-done{ background:#f9fafb; border-color:#e5e7eb; }
     .fx-head{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:6px; }

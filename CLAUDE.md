@@ -21,7 +21,7 @@ Attendance reporting system for **โรงเรียนชานุมาน�
 | `js/index.js`, `js/report.js` | Per-page scripts (all logic) |
 | `js/fixes.js` | Data-fix engine + review UI (loaded **before** `report.js`; exposes `window.FIXES`) |
 | `Code.gs` | Google Apps Script backend (lives in Apps Script console; copy kept in repo) |
-| `docs/spec-code-gs-fixes.md` | Spec the sheet owner follows to move fix decisions from localStorage into the Sheet |
+| `docs/spec-code-gs-fixes.md` | How fix decisions are stored in the Sheet (`แก้ข้อมูล` sheet, wire format, deploy + test steps) |
 | `fonts/*.woff2` | TH Sarabun New, 4 styles, self-hosted web font |
 | `_headers` | Netlify cache rules (HTML no-cache, fonts immutable) |
 | `logo.png` | School crest (used by `report.html`; `index.html` embeds it as base64) |
@@ -64,7 +64,9 @@ Each page = `*.html` (markup) + `css/*.css` (styles, incl. `@font-face` and the 
 - **`allRows`** holds every Sheet row (one per student). Grouping helpers rebuild higher-level views:
   - `buildStudentGroups` (per student, with subjects sub-rows + overall % from total present/total periods), `buildReportGroups` (per submission timestamp), `buildTeacherGroups`, `buildSubjectGroups`.
 - **KPI cards** open detail modals via `openCardModal(type)`; the student card (`renderStudentTable`) has its own filter bar + expandable rows. It uses **virtual scrolling** — `renderWindow()` renders only the ~visible rows plus top/bottom spacer `<tr>`s (height = off-screen rows × measured `ROW_H`), recomputed on scroll via rAF; expanded-row sub-table heights are cached in `subH`. Sub-tables are also **lazy** (built only when a row is expanded). Both shrink the popup DOM (137+ students × nested per-subject tables would be thousands of nodes). The other card renders (`renderReportTable`/`renderTeacherTable`/`renderSubjectCardTable`) still build all rows at once — only the student card was hot enough to virtualize.
-- **Data fixes (`js/fixes.js`)** — teachers type the same person/room/subject differently, so counts split. The engine proposes, a human always decides, and decisions overlay the data at display time (`FIXES.apply()` runs inside `normalizeRows`, so cards/charts/table/CSV all move together). `restore()` runs first on every apply, making it idempotent and making undo instant. The Sheet is never modified — printed forms keep the teacher's original text.
+- **Data fixes (`js/fixes.js`)** — teachers type the same person/room/subject differently, so counts split. The engine proposes, a human always decides, and decisions overlay the data at display time (`FIXES.apply()` runs inside `normalizeRows`, so cards/charts/table/CSV all move together). `restore()` runs first on every apply, making it idempotent and making undo instant. The **`รายงาน` sheet** is never modified — printed forms keep the teacher's original text.
+  - **Decisions live in the Sheet** (`แก้ข้อมูล` sheet, via `action=fixes` / `action=savefix`), so every machine sees the same fixes. `report.js` calls `FIXES.connect({url,key,fixes})` on login *before* the first `normalizeRows`, and passes `data.fixes` into `normalizeRows(rows, fixes)` on every poll. Three layers inside the store, because the write leg is `no-cors` and cannot read its own response: `serverList` (what is in the Sheet) + `queue` (pressed but not yet confirmed, mirrored to `localStorage`) = `decisions` (what the screen shows, so a press is instant). After POSTing, it re-reads `action=fixes` and compares **id + signature** before clearing the queue, retrying twice (1.5 s, 3 s) — same send-then-verify shape as the entry form's `action=verify`, and for the same reason. Failures surface as a red bar with a retry button; they are never silently swallowed. `flush()` iterates the live queue, not a snapshot, because one press in manual mode can enqueue both a name and a room fix.
+  - If `doGet` comes back with **no `fixes` field at all**, the deployed Apps Script is an older version — the panel says so outright and keeps decisions queued locally instead of pretending they saved. Editing `Code.gs` in the repo (or pressing Run in the editor) changes nothing until **Manage deployments → New version**.
   - Matching: strip prefixes stuck into the name field (`นางสาวฉัตรชนก บัวศรี` vs `ฉัตรชนก บัวศรี`) → fold same-sounding Thai letters (ณ/น, ด/ต, ศ/ษ/ส, tone marks) → edit distance ≤2, but only within the same grade level **and** with a matching surname **and** a near-identical first name (this triple guard is what stops siblings like `ธนภัทร`/`ศศิธร กุระจินดา` from being proposed).
   - Rooms: a student reported by several teachers gives a majority vote; the minority entry is the typo. `detectTicketRoomIssues()` escalates when one submission has ≥2 such students — that teacher mis-keyed the whole form.
   - Teachers are compared as prefix+name combined, because the report counts them that way — `นางสุมาลี` vs `นายสุมาลี` is the real duplicate, and `apply()` splits the chosen value back into the two Sheet columns.
@@ -86,8 +88,9 @@ Web App bound to a spreadsheet with a **"รายงาน"** sheet (22 columns
 
 | Entry | Purpose |
 |---|---|
-| `doGet` | `action=verify` → count rows by `sid` (no password, no data). Else check `key` against `REPORT_PASSWORD` (Script Property) / `DEFAULT_REPORT_PASSWORD`, then return all rows. Replies as **JSONP** (avoids CORS). |
-| `doPost` | `saveToSheet(JSON body)` |
+| `doGet` | `action=verify` → count rows by `sid` (no password, no data). Else check `key` against `REPORT_PASSWORD` (Script Property) / `DEFAULT_REPORT_PASSWORD`, then `action=fixes` → `readFixes()`, or return `{rows, fixes}` together (one round-trip for the dashboard). Replies as **JSONP** (avoids CORS). |
+| `doPost` | `action=savefix` → `saveFix(data.fix)` (password-checked), else `saveToSheet(JSON body)` |
+| `saveFix` / `readFixes` | Read-write the `แก้ข้อมูล` sheet (8 cols). Same-`id` write overwrites; `remove:true` deletes. `LockService` serializes writers. |
 | `saveToSheet` | `LockService` (serializes concurrent writers); `removeRowsBySubmissionId` then batch-write = **same submissionId overwrites, new one appends**; aborts if `students` is empty (never deletes old data with nothing to write back). |
 
 `readSheet` reads by a **fixed column order** (not Sheet headers) so a stale header row can't break mapping. Dates → ISO strings.
@@ -97,13 +100,17 @@ Web App bound to a spreadsheet with a **"รายงาน"** sheet (22 columns
 ```
 index.html  --POST no-cors JSON-->  Code.gs doPost --> saveToSheet --> "รายงาน" sheet
 index.html  --GET verify (JSONP)-->  Code.gs doGet  --> countBySubmissionId   (confirm save)
-report.html --GET key=pass (JSONP)-> Code.gs doGet  --> readSheet --> allRows  (dashboard)
+report.html --GET key=pass (JSONP)-> Code.gs doGet  --> readSheet + readFixes --> allRows + FIXES  (dashboard)
+report.html --POST savefix ------->  Code.gs doPost --> saveFix   --> "แก้ข้อมูล" sheet
+report.html --GET action=fixes ---> Code.gs doGet  --> readFixes                 (confirm the fix landed)
 ```
 
 ## Key Constants
 
 - `index.html`: `THRESHOLD = 70`, `MIN_DOC_ROWS = 10`, `PREFIX_OPTIONS`, `REMARK_OPTIONS`, `DRAFT_KEY = 'chanu_attendance_draft_v1'`
 - `report.html`: `SHEET_URL`, `THRESHOLD = 70`, `MIN_DOC_ROWS = 10`, `COL` (Sheet column-name map)
+- `js/fixes.js`: `QUEUE_KEY = 'chanu_data_fixes_queue_v1'` (unsent decisions), `OLD_KEY = 'chanu_data_fixes_v1'` (v1.2.0's local-only store — migrated into the queue on first load, then removed)
+- `Code.gs`: `FIX_SHEET = 'แก้ข้อมูล'`, `FIX_HEADERS`
 - `Code.gs`: `DEFAULT_REPORT_PASSWORD` (override with Script Property `REPORT_PASSWORD`)
 
 ## Fonts (self-hosted)
@@ -119,7 +126,8 @@ report.html --GET key=pass (JSONP)-> Code.gs doGet  --> readSheet --> allRows  (
 ## Conventions & Gotchas
 
 - **Timezone:** Sheet datetimes are UTC; always `+7*3600*1000` before formatting Thai dates (`fmtDate`/`thaiDate`/`fmtTime` all do this — a recurring bug source).
-- **`no-cors`:** submit fetch always resolves; never trust it for success — use the `verify` round-trip.
+- **`no-cors`:** submit fetch always resolves; never trust it for success — use the `verify` round-trip. Both write paths do this: the entry form via `action=verify`, the fix panel via re-reading `action=fixes`.
+- **`savefix` payload nests the record under `fix`** — the envelope and the record both have a field called `action` (`savefix` outside, `merge`/`ignore` inside). Reading the record straight off the envelope writes the literal string `savefix` into the sheet's `การกระทำ` column for every row. Subject values are objects (`{name, code}`) and go through `fixValueOut_`/`fixValueIn_` as JSON text — writing them raw stores `[object Object]`.
 - **`window.print()` only** — there is intentionally no client PDF library (pdfmake/html2pdf were removed). Single button "🖨 พิมพ์ / บันทึก PDF".
 - **Print color:** `@media print` sets `print-color-adjust:exact` on `.doc-paper *` so header/grade band colors survive printing.
 - **Mobile table:** `.table-wrap` gets `overflow-x:auto` only under `@media (max-width:720px)` — doing it globally would turn `overflow-y` to `auto` and break the sticky form header on desktop.

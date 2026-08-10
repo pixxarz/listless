@@ -81,6 +81,19 @@ function getFixSheet_() {
   return sh;
 }
 
+// ===== ช่อง "ค่าที่ใช้" เก็บได้ 2 แบบ =====
+// ชื่อ/ห้อง = ข้อความธรรมดา · วิชา = ต้องเก็บทั้งชื่อและรหัสคู่กัน จึงเก็บเป็นข้อความ JSON
+// ถ้าเขียนลงไปตรงๆ จะได้คำว่า [object Object] แล้วหน้าเว็บอ่านกลับมาใช้ไม่ได้
+function fixValueOut_(v) {
+  if (v === null || v === undefined) return '';
+  return (typeof v === 'object') ? JSON.stringify(v) : String(v);
+}
+function fixValueIn_(s) {
+  var t = String(s === null || s === undefined ? '' : s);
+  if (t.charAt(0) === '{') { try { return JSON.parse(t); } catch (e) {} }
+  return t;
+}
+
 // อ่านรายการทั้งหมด — หน้ารายงานเรียกตอนโหลดข้อมูล
 function readFixes() {
   var sh = getFixSheet_();
@@ -94,7 +107,7 @@ function readFixes() {
       id: String(row[0]),
       type: String(row[1]),
       action: String(row[2]),
-      value: String(row[3]),
+      value: fixValueIn_(row[3]),
       members: String(row[4]) ? String(row[4]).split('||') : [],
       title: String(row[5]),
       by: String(row[6]),
@@ -127,7 +140,7 @@ function saveFix(data) {
       id,
       String(data.type || ''),
       String(data.action || ''),
-      String(data.value || ''),
+      fixValueOut_(data.value),
       (data.members || []).join('||'),
       String(data.title || ''),
       String(data.by || ''),
@@ -173,11 +186,14 @@ function doPost(e) {
     var data = JSON.parse(e.postData.contents);
 
     // ===== บันทึก/ลบ ผลการตรวจสอบข้อมูล (มาจากหน้ารายงาน ต้องมีรหัสผ่าน) =====
+    // ⚠️ ตัวรายการอยู่ใน data.fix ไม่ใช่ตัว data เอง เพราะทั้งคู่มีช่องชื่อ action
+    //    ข้างนอกคือชนิดคำสั่ง (savefix) ข้างในคือผลการตัดสิน (merge / ignore)
+    //    ถ้าอ่านจากตัว data ตรงๆ ช่อง "การกระทำ" ในชีตจะกลายเป็นคำว่า savefix ทุกแถว
     if (data.action === 'savefix') {
       var props2 = PropertiesService.getScriptProperties();
       var pass2 = props2.getProperty('REPORT_PASSWORD') || DEFAULT_REPORT_PASSWORD;
       if (String(data.key || '') !== String(pass2)) throw new Error('unauthorized');
-      saveFix(data);
+      saveFix(data.fix || data);
       return ContentService
         .createTextOutput(JSON.stringify({ result: 'OK' }))
         .setMimeType(ContentService.MimeType.JSON);

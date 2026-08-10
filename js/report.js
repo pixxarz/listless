@@ -10,7 +10,7 @@
     periods:'คาบทั้งหมด', present:'มาเรียน', absent:'ขาดเรียน', percent:'% การเข้าเรียน', remark:'หมายเหตุ' };
 
   var allRows=[];
-  var currentPass='', pollTimer=null, polling=false, seenTs={};
+  var currentPass='', pollTimer=null, polling=false, seenTs={}, seenFixes='';
 
   // ===== แก้ปีเพี้ยน: บางเครื่องของครูส่งวันที่มาเป็น พ.ศ. (2569-08-10) แทน ค.ศ. =====
   // ทั้งเว็บคิดบนสมมติฐานว่าวันที่จากชีตเป็น ค.ศ. เสมอ แล้วค่อย +543 ตอนแสดงผล
@@ -47,14 +47,19 @@
     return ' <span class="date-fixed" title="วันที่ต้นทางเขียนมาว่า '+esc(fmtDate(raw))+' ซึ่งห่างจากเวลาที่บันทึกเข้าระบบจริงมากผิดปกติ ระบบจึงแก้ให้ตรงกับเวลาจริงแล้ว">⚠</span>';
   }
 
-  function normalizeRows(rows){
+  // fixes = ผลการตรวจสอบข้อมูลที่อ่านมาจากแผ่น "แก้ข้อมูล" — doGet แนบมากับ rows ในคำตอบเดียวกัน
+  function normalizeRows(rows, fixes){
     (rows||[]).forEach(function(r){
       r[COL.date]=beToCE(r[COL.date]); r[COL.ts]=beToCE(r[COL.ts]);
       checkDateAgainstServer(r);
     });
     // เอาผลการตรวจสอบข้อมูล (ชื่อ/ห้อง/วิชา ที่คนยืนยันแล้ว) มาทับ
     // ทำตรงนี้จุดเดียว ทุกส่วนของหน้ารายงานจึงเห็นค่าที่แก้แล้วตรงกันหมด
-    if(window.FIXES){ window.FIXES.setCol(COL); window.FIXES.apply(rows||[]); }
+    if(window.FIXES){
+      window.FIXES.setCol(COL);
+      if(fixes) window.FIXES.setServerFixes(fixes);   // เครื่องอื่นกดอะไรไว้ ตามมาเองทุกครั้งที่ดึงข้อมูล
+      window.FIXES.apply(rows||[]);
+    }
     return rows||[];
   }
 
@@ -78,13 +83,16 @@
     jsonp({ key:currentPass }, function(data){
       polling=false;
       if(!data || data.result!=='OK' || !data.rows) return;
-      var rows=normalizeRows(data.rows), newTs={}, cnt=0;
+      var rows=normalizeRows(data.rows, data.fixes), newTs={}, cnt=0;
       rows.forEach(function(r){ var t=String(r[COL.ts]||''); if(t && !seenTs[t] && !newTs[t]){ newTs[t]=1; cnt++; } });
-      if(cnt>0){
-        allRows=rows;
+      // ผลการตรวจสอบข้อมูลถูกแก้จากเครื่องอื่นได้ ต้องตามให้ทันด้วย ไม่ใช่รอจนกว่าจะมีใบใหม่เข้ามา
+      // อัปเดตเงียบๆ ไม่ต้องเด้งเตือน เพราะส่วนใหญ่เป็นผลจากที่เครื่องนี้เพิ่งกดไปเอง
+      var fx=JSON.stringify(data.fixes||[]), fxChanged=(fx!==seenFixes);
+      if(cnt>0 || fxChanged){
+        allRows=rows; seenFixes=fx;
         rows.forEach(function(r){ var t=String(r[COL.ts]||''); if(t) seenTs[t]=1; });
         render();   // สร้างตาราง/กราฟ/KPI ใหม่ทันที (คงตัวกรอง+การเรียงที่ผู้ใช้เลือกอยู่)
-        showToast('🔔 มีรายงานใหม่เข้ามา '+cnt+' ใบ — อัปเดตตารางให้แล้ว');
+        if(cnt>0) showToast('🔔 มีรายงานใหม่เข้ามา '+cnt+' ใบ — อัปเดตตารางให้แล้ว');
       }
     });
   }
@@ -111,8 +119,11 @@
   function tryLogin(pass, onFail){
     jsonp({ key:pass }, function(data){
       if(data && data.result==='OK'){
-        allRows=normalizeRows(data.rows||[]);
         currentPass=pass;   // เก็บใน memory (หายเมื่อปิด/รีเฟรชหน้า) เพื่อใช้เช็ครายงานใหม่อัตโนมัติ
+        // ต่อระบบตรวจสอบข้อมูลเข้ากับหลังบ้านก่อน normalizeRows รอบแรก — ไม่งั้นรอบแรกจะทับข้อมูลด้วยผลการตรวจเปล่าๆ
+        if(window.FIXES) window.FIXES.connect({ url:SHEET_URL, key:pass, fixes:data.fixes });
+        seenFixes=JSON.stringify(data.fixes||[]);
+        allRows=normalizeRows(data.rows||[]);
         gate.classList.add('hidden'); main.classList.remove('hidden');
         initApp();
       } else if(data && data.error==='unauthorized'){
