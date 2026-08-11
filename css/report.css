@@ -325,6 +325,18 @@
     .fx-sync-bad{ background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; }
     .fx-retry{ background:#dc2626; border:none; border-radius:999px; padding:5px 14px; font-family:inherit; font-size:13px; color:#fff; cursor:pointer; }
     .fx-retry:hover{ filter:brightness(1.08); }
+    .fx-count-done{ background:#16a34a; }
+    /* กล่องยืนยันก่อนเปลี่ยนข้อมูลจริง — ต้องอยู่เหนือป๊อปอัปตรวจสอบข้อมูล (z-index 400) */
+    .fx-cfm{ position:fixed; inset:0; z-index:600; background:rgba(17,24,39,.55); display:flex; align-items:center; justify-content:center; padding:18px; }
+    .fx-cfm-box{ background:#fff; border-radius:16px; max-width:520px; width:100%; padding:20px 22px; box-shadow:0 18px 50px rgba(0,0,0,.3); max-height:90vh; overflow-y:auto; }
+    .fx-cfm-head{ font-size:19px; font-weight:700; color:var(--purple-dark); margin-bottom:12px; }
+    .fx-cfm-row{ display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; padding:7px 0; border-bottom:1px dashed var(--line); font-size:14.5px; }
+    .fx-cfm-row span{ color:var(--muted); font-size:13px; min-width:118px; }
+    .fx-cfm-row b{ color:#111827; flex:1 1 160px; word-break:break-word; }
+    .fx-cfm-warn{ background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:10px; padding:10px 12px; margin-top:12px; font-size:13.5px; line-height:1.6; }
+    .fx-cfm-act{ display:flex; gap:10px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap; }
+    .fx-btn.fx-danger{ background:linear-gradient(135deg,#ef4444,#b91c1c); }
+    @media (max-width:520px){ .fx-cfm-act{ justify-content:stretch; } .fx-cfm-act .fx-btn{ flex:1 1 auto; } }
     .fx-card{ background:#fff; border:1px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:12px; }
     .fx-card.fx-done{ background:#f9fafb; border-color:#e5e7eb; }
     .fx-head{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:6px; }
@@ -334,6 +346,22 @@
     .fx-title{ font-size:15px; font-weight:600; color:#111827; }
     .fx-dim{ color:var(--muted); font-size:12.5px; font-weight:400; }
     .fx-reason{ font-size:13px; color:#6b7280; margin-bottom:10px; }
+    /* 🚨 ไฮไลต์ตัวอักษรที่ต่างกัน — เคสจริงต่างกันแค่ไม้ทัณฑฆาตตัวเดียว ตาเปล่าไม่มีทางเห็น
+       ต้องเด่นพอที่จะสะดุดตาแม้เป็นอักขระตัวเดียว จึงใช้ทั้งพื้นหลัง ตัวหนา และเส้นใต้ */
+    .fx-df{ background:#fde68a; color:#7c2d12; font-weight:700; border-radius:3px;
+            padding:0 1px; box-shadow:inset 0 -2px 0 #f59e0b; }
+    .fx-df-legend{ background:#fde68a; color:#7c2d12; border-radius:3px; padding:0 5px; box-shadow:inset 0 -2px 0 #f59e0b; }
+    /* ขีดบอกว่า "อีกตัวเลือกมีตัวอักษรตรงนี้ แต่อันนี้ขาดไป" — ไม่มีขีดนี้ ฝั่งที่ขาดจะดูสะอาดเหมือนไม่มีอะไรผิด */
+    .fx-df-gap{ display:inline-block; width:3px; height:1.05em; vertical-align:-0.18em; margin:0 1px;
+                background:#f59e0b; border-radius:2px; cursor:help; }
+    .fx-hint{ font-size:12.5px; color:#6b7280; margin-bottom:8px; }
+    .fx-best{ background:#ede9fe; color:var(--purple-dark); font-size:11.5px; font-weight:600;
+              border-radius:999px; padding:2px 9px; }
+    /* ปุ่มตัวเลือกที่สองไม่ใช่ปุ่มยกเลิก เป็นการตัดสินใจอีกแบบ — ต้องดูเป็นปุ่มเลือกจริงๆ ไม่ใช่ปุ่มปิด */
+    .fx-btn.fx-alt{ background:#fff; color:#374151; border:1.5px solid #9ca3af; font-weight:500; }
+    .fx-btn.fx-alt:hover{ background:#f3f4f6; border-color:#6b7280; filter:none; }
+    .fx-willdo{ margin-top:10px; font-size:12.5px; line-height:1.65; color:#92400e;
+                background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:8px 11px; }
     .fx-opts{ display:flex; flex-direction:column; gap:7px; margin-bottom:11px; }
     .fx-opt{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; border:1px solid var(--line); border-radius:10px; padding:9px 12px; cursor:pointer; font-size:14px; transition:border-color .12s, background .12s; }
     .fx-opt:hover{ border-color:#c4b5fd; }

@@ -114,6 +114,15 @@
     timer=setTimeout(function(){ if(!done){ cleanup(); cb({error:'timeout'}); } }, 20000);
   }
 
+  // ระบบตรวจสอบข้อมูลเพิ่งแก้แผ่น "รายงาน" ไปจริง แล้วดึงข้อมูลชุดใหม่มาให้ — เอามาใช้แทนของเดิมทั้งชุด
+  // snapshotSeen ก่อน render กันไม่ให้เด้งเตือน "มีรายงานใหม่" ทั้งที่เป็นข้อมูลชุดเดิมที่เพิ่งแก้ไป
+  function adoptRows(rows, fixes){
+    allRows=normalizeRows(rows||[], fixes);
+    seenFixes=JSON.stringify(fixes||[]);
+    snapshotSeen();
+    render(); updateFixCount();
+  }
+
   // ====== Password gate ======
   var gate=document.getElementById('gate'), main=document.getElementById('main');
   function tryLogin(pass, onFail){
@@ -121,7 +130,7 @@
       if(data && data.result==='OK'){
         currentPass=pass;   // เก็บใน memory (หายเมื่อปิด/รีเฟรชหน้า) เพื่อใช้เช็ครายงานใหม่อัตโนมัติ
         // ต่อระบบตรวจสอบข้อมูลเข้ากับหลังบ้านก่อน normalizeRows รอบแรก — ไม่งั้นรอบแรกจะทับข้อมูลด้วยผลการตรวจเปล่าๆ
-        if(window.FIXES) window.FIXES.connect({ url:SHEET_URL, key:pass, fixes:data.fixes });
+        if(window.FIXES) window.FIXES.connect({ url:SHEET_URL, key:pass, fixes:data.fixes, onRows:adoptRows });
         seenFixes=JSON.stringify(data.fixes||[]);
         allRows=normalizeRows(data.rows||[]);
         gate.classList.add('hidden'); main.classList.remove('hidden');
