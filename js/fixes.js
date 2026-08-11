@@ -635,11 +635,66 @@
 
   function optLabel(o){ return (o.value && typeof o.value==='object')?o.label:o.value; }
   function optNote(o){
-    var n=o.tickets+' ใบ';
-    if(o.teachers && o.teachers.length) n+=' · ครู '+o.teachers.length+' คนกรอกตรงกัน';
-    if(o.stuck) n+=' · มีคำนำหน้าติดมา';
-    if(o.badFormat) n+=' · รหัสผิดรูปแบบ';
-    return n;
+    // ห้ามใช้คำว่า "ใบ" — เป็นศัพท์ในหัวคนทำระบบ ครูที่มาเจอครั้งแรกไม่รู้ว่าหมายถึงอะไร
+    var n=[];
+    if(o.teachers && o.teachers.length) n.push('ครู '+o.teachers.length+' คนกรอกแบบนี้');
+    else n.push('พบ '+o.tickets+' ครั้ง');
+    if(o.stuck) n.push('มีคำนำหน้าติดมาในชื่อ');
+    if(o.badFormat) n.push('รหัสผิดรูปแบบ');
+    return n.join(' · ');
+  }
+
+  /* ---------- ไฮไลต์ตัวอักษรที่ต่างกัน ----------
+     🚨 นี่คือหัวใจของการ์ดนี้ ไม่ใช่ของประดับ
+     เคสจริงต่างกันแค่ตัวเดียว — "พิมพะวงศ์" กับ "พิมพะวงศ" ต่างกันที่ไม้ทัณฑฆาตตัวเดียว
+     ถ้าไม่ทำเครื่องหมายไว้ ครูมองด้วยตาเปล่าไม่มีทางเห็น แล้วจะกดเลือกโดยไม่รู้ว่าเลือกอะไรอยู่
+     ------------------------------------------------- */
+  // สระบนล่างและวรรณยุกต์ไทย — ลอยเดี่ยวไม่ได้ ต้องเกาะตัวพยัญชนะข้างหน้าเสมอ
+  var THAI_MARK=/[ัิ-ฺ็-๎]/;
+  function diffHTML(a, b){
+    a=String(a==null?'':a); b=String(b==null?'':b);
+    if(!b || a===b) return esc(a);
+    var m=a.length, n=b.length, i, j;
+    // ตารางความยาวลำดับตัวอักษรร่วมที่ยาวที่สุด (LCS) — ตัวที่ไม่อยู่ใน LCS คือตัวที่ต่าง
+    var dp=[]; for(i=0;i<=m;i++){ dp.push([]); for(j=0;j<=n;j++) dp[i][j]=0; }
+    for(i=1;i<=m;i++) for(j=1;j<=n;j++)
+      dp[i][j]=(a.charAt(i-1)===b.charAt(j-1)) ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+    // เดินย้อนกลับเก็บเป็นคำสั่งทีละตัว
+    //   s = มีเหมือนกัน · d = ตัวของฝั่งนี้ที่อีกฝั่งไม่มี · i = ตัวของอีกฝั่งที่ฝั่งนี้ขาดไป
+    var ops=[]; i=m; j=n;
+    while(i>0 || j>0){
+      if(i>0 && j>0 && a.charAt(i-1)===b.charAt(j-1)){ ops.push({t:'s', c:a.charAt(i-1)}); i--; j--; }
+      else if(j>0 && (i===0 || dp[i][j-1]>=dp[i-1][j])){ ops.push({t:'i'}); j--; }
+      else { ops.push({t:'d', c:a.charAt(i-1)}); i--; }
+    }
+    ops.reverse();
+    // ถ้าตัวที่ต่างเป็นสระ/วรรณยุกต์ ต้องลากพยัญชนะข้างหน้ามาไฮไลต์ด้วย
+    // ไม่งั้นมันจะถูกตัดออกมาลอยเดี่ยวๆ แล้วแสดงผลเพี้ยน อ่านไม่ออกเลย
+    for(i=0;i<ops.length;i++){
+      if(ops[i].t!=='d' || !THAI_MARK.test(ops[i].c||'')) continue;
+      for(j=i-1;j>=0;j--){ if(ops[j].c!=null){ ops[j].t='d'; break; } }
+    }
+    var out='', open=false;
+    for(i=0;i<ops.length;i++){
+      var op=ops[i];
+      if(op.t==='i'){
+        // อีกฝั่งมีตัวอักษรตรงนี้ แต่ฝั่งนี้ขาดไป — ต้องบอกด้วย ไม่งั้นฝั่งที่ "ขาด" จะดูสะอาดเหมือนไม่มีอะไรผิด
+        if(open){ out+='</mark>'; open=false; }
+        if(ops[i-1] && ops[i-1].t==='i') continue;   // ขาดติดกันหลายตัว ขีดเดียวพอ
+        out+='<span class="fx-df-gap" title="ตัวเลือกอีกอันมีตัวอักษรตรงนี้"></span>';
+        continue;
+      }
+      if(op.t==='d' && !open){ out+='<mark class="fx-df">'; open=true; }
+      if(op.t==='s' && open){ out+='</mark>'; open=false; }
+      out+=esc(op.c);
+    }
+    return out+(open?'</mark>':'');
+  }
+  // ตัวเลือกแรกเทียบกับตัวที่สอง ตัวที่เหลือเทียบกับตัวแรก — คนอ่านจะเห็นว่า "ต่างกันตรงนี้" ทั้งสองฝั่ง
+  function optHTML(list, i){
+    var self=String(optLabel(list[i])==null?'':optLabel(list[i]));
+    var other=list.length>1 ? String(optLabel(list[i===0?1:0])||'') : '';
+    return diffHTML(self, other);
   }
 
   // การ์ด 1 รายการ
@@ -663,12 +718,13 @@
       return h+'</div>';
     }
 
+    h+='<div class="fx-hint">แตะเลือกค่าที่ถูก แล้วกดปุ่มสีม่วง — <b class="fx-df-legend">ตัวที่ไฮไลต์</b> คือจุดที่เขียนต่างกัน</div>';
     h+='<div class="fx-opts">';
     it.options.forEach(function(o,i){
-      var v=optLabel(o);
       h+='<label class="fx-opt'+(i===0?' fx-pick':'')+'">'
         + '<input type="radio" name="fx'+idx+'" value="'+i+'"'+(i===0?' checked':'')+'>'
-        + '<span class="fx-val">'+esc(v)+'</span>'
+        + '<span class="fx-val">'+optHTML(it.options,i)+'</span>'
+        + (i===0?'<span class="fx-best">ระบบแนะนำ</span>':'')
         + '<span class="fx-dim">'+esc(optNote(o))+'</span></label>';
     });
     // ช่องพิมพ์ค่าที่ถูกเอง เผื่อครูกรอกผิดทั้งคู่ ไม่มีตัวเลือกไหนถูกเลย
@@ -683,10 +739,17 @@
     }
     h+='</label></div>';
 
+    // ปุ่มที่สองไม่ใช่ "ยกเลิก" แต่เป็นการตัดสินใจอีกแบบ — ต้องเขียนให้อ่านออกว่าเลือกอะไร
+    // ของเดิมเขียนว่า "คนละคน" วางข้างปุ่มม่วงเหมือนปุ่มรอง ครูจะกดเพราะนึกว่าปิดหน้าต่าง
+    var altText=(it.type==='room') ? 'ห้องนี้ถูกอยู่แล้ว ไม่ต้องแก้'
+              : (it.type==='subject') ? 'เป็นคนละวิชากัน ไม่ต้องรวม'
+              : 'เป็นคนละคนกัน ไม่ต้องรวม';
     h+='<div class="fx-actions">'
-      + '<button type="button" class="fx-btn fx-ok">'+(it.type==='room'?'ใช้ห้องนี้ทุกใบ':(it.type==='subject'?'รวมเป็นวิชาเดียวกัน':'ใช้ชื่อนี้ทุกใบ'))+'</button>'
-      + '<button type="button" class="fx-btn fx-no">'+(it.type==='room'?'ไม่แก้':(it.type==='subject'?'คนละวิชา':'คนละคน'))+'</button>'
+      + '<button type="button" class="fx-btn fx-ok">'+(it.type==='room'?'แก้ห้องให้เป็นค่าที่เลือก':(it.type==='subject'?'รวมเป็นวิชาที่เลือก':'แก้ชื่อให้เป็นค่าที่เลือก'))+'</button>'
+      + '<button type="button" class="fx-btn fx-no fx-alt">'+altText+'</button>'
       + '</div>';
+    h+='<div class="fx-willdo">กดปุ่มม่วงแล้ว <b>ข้อมูลในแผ่นรายงานจะถูกแก้จริง</b> ทุกแถวที่เขียนแบบเดิม '
+      + 'ระบบจะถามยืนยันอีกครั้งพร้อมบอกว่ากระทบกี่แถว และย้อนกลับได้ที่แท็บ <b>แก้ไปแล้ว</b></div>';
     return h+'</div>';
   }
 
@@ -1176,7 +1239,8 @@
     // ยกเลิก = ลบผลการตัดสิน แล้วย้อนค่าในแผ่น "รายงาน" กลับจากแผ่น "ค่าเดิม"
     undo:function(id){ removeDecision(id); undoMain(id); },
     // เปิดออกมาให้ report.js และการทดสอบเรียกใช้ได้
-    util:{ baseName:baseName, phonetic:phonetic, nameKey:nameKey, lev:lev, hasStuckPrefix:hasStuckPrefix, CODE_OK:CODE_OK }
+    util:{ baseName:baseName, phonetic:phonetic, nameKey:nameKey, lev:lev, hasStuckPrefix:hasStuckPrefix,
+           CODE_OK:CODE_OK, diffHTML:diffHTML }
   };
 
 })();
