@@ -85,8 +85,9 @@
   var serverList=[];  // [{id,type,action,value,members,title,by,at}] ตามที่อยู่ในชีต
   var queue=[];       // [{id, rec:{...}}] = บันทึก · [{id, remove:true}] = ยกเลิกการตัดสิน
   var decisions=[];   // ผลรวมที่ทุกส่วนของหน้าจอใช้
-  var api={ url:'', key:'', ready:false };  // ready=false → Apps Script ที่ deploy ไว้ยังเป็นเวอร์ชันเก่า
-  var sync={ busy:false, okAt:0 };
+  var api={ url:'', key:'', ready:false, onRows:null };  // ready=false → Apps Script ที่ deploy ไว้ยังเป็นเวอร์ชันเก่า
+  var sync={ busy:false, okAt:0, main:null };
+  var mainRows=null;   // แถวชุดล่าสุดที่หน้ารายงานถืออยู่ ใช้คำนวณว่าจะแก้ช่องไหนในแผ่น "รายงาน"
 
   function storage(){ try{ return window.localStorage; }catch(e){ return null; } }
   function findIn(list,id){ for(var i=0;i<list.length;i++){ if(list[i].id===id) return list[i]; } return null; }
@@ -168,6 +169,121 @@
   function payload(q){
     var fix=q.remove ? { id:q.id, remove:true } : q.rec;
     return { action:'savefix', key:api.key, fix:fix };
+  }
+
+  /* ---------- แก้ข้อมูลในแผ่น "รายงาน" จริง ----------
+     ชีตหลักคือของที่ครูเอาไปทำงานต่อ ไม่ใช่แค่ให้หน้าเว็บสวย จึงต้องแก้ลงไปจริง
+     ส่งเป็น "รายการช่อง" (แถว + ชื่อคอลัมน์ + ค่าเดิม + ค่าใหม่) ไม่ใช่สั่งลอยๆ
+     🚨 ค่าเดิมที่ส่งไปคือด่านกันพลาด — หลังบ้านจะเขียนต่อเมื่อช่องนั้นยังเป็นค่าเดิมอยู่จริง
+     ค่าเดิมถูกเก็บไว้ที่แผ่น "ค่าเดิม" (คนละแผ่นกับรายงาน) จึงกดย้อนได้
+     ------------------------------------------------- */
+  // ค่าที่อยู่ในชีตจริง — แถวบนจอถูกทับด้วยผลการตัดสินไปแล้ว ต้องย้อนดูค่าก่อนทับที่เก็บไว้ที่ _orig*
+  function origName(r){ return r._origName!=null?String(r._origName):sName(r); }
+  function origCls(r){ return r._origCls!=null?String(r._origCls):cls(r); }
+  function origTeacher(r){
+    if(r._origTeacher!=null){
+      var s=String(r._origTeacher), m=s.match(PREFIX_RE);
+      return { prefix:m?m[1]:'', name:s.replace(PREFIX_RE,'').trim(), full:rawName(s) };
+    }
+    return { prefix:String(r[COL.tPrefix]||''), name:String(r[COL.tName]||''), full:rawName(tName(r)) };
+  }
+  function origSubject(r){
+    if(r._origSubject!=null){
+      var m=String(r._origSubject).match(/^(.*)\s\(([^)]*)\)$/);
+      if(m) return { name:m[1], code:m[2] };
+    }
+    return { name:subjName(r), code:code(r) };
+  }
+
+  function mainEdits(rows, d){
+    var out=[];
+    if(!COL || !rows || !rows.length || !d || d.action!=='merge') return out;
+    rows.forEach(function(r){
+      var rw=r._row; if(!rw) return;   // หลังบ้านเวอร์ชันเก่าไม่ส่งเลขแถวมา ข้ามไปดีกว่าเขียนมั่ว
+      if(d.type==='name'){
+        var cur=origName(r);
+        if(d.members.indexOf(rawName(cur))>=0 && cur!==d.value)
+          out.push({ row:rw, col:COL.sName, from:cur, to:d.value });
+      } else if(d.type==='teacher'){
+        var t=origTeacher(r);
+        if(d.members.indexOf(t.full)>=0 && t.full!==d.value){
+          // ค่าที่เลือกเป็น "คำนำหน้า+ชื่อ" รวมกัน ต้องแยกกลับลง 2 ช่องตามโครงสร้างชีต
+          var m=String(d.value).match(PREFIX_RE);
+          var np=m?m[1]:'', nn=String(d.value).replace(PREFIX_RE,'').trim();
+          if(t.prefix!==np) out.push({ row:rw, col:COL.tPrefix, from:t.prefix, to:np });
+          if(t.name!==nn)   out.push({ row:rw, col:COL.tName,   from:t.name,   to:nn });
+        }
+      } else if(d.type==='room'){
+        // ห้องผูกกับตัวนักเรียน เทียบด้วยคีย์เสียง — เช็คทั้งชื่อบนจอและชื่อในชีต เผื่อชื่อถูกทับไปแล้ว
+        var oc=origCls(r);
+        if((d.members.indexOf(nameKey(sName(r)))>=0 || d.members.indexOf(nameKey(origName(r)))>=0) && oc!==d.value)
+          out.push({ row:rw, col:COL.cls, from:oc, to:d.value });
+      } else if(d.type==='subject'){
+        if(!d.value || typeof d.value!=='object') return;
+        var s=origSubject(r);
+        var hit=(d.members.indexOf(s.code)>=0) || (d.members.indexOf(NOCODE+s.name)>=0);
+        if(!hit) return;
+        if(s.name!==d.value.name) out.push({ row:rw, col:COL.subject, from:s.name, to:d.value.name });
+        if(s.code!==d.value.code) out.push({ row:rw, col:COL.code,    from:s.code, to:d.value.code });
+      }
+    });
+    return out;
+  }
+
+  // นับแถวที่ถูกกระทบ (1 แถวอาจมีหลายช่อง เช่นวิชาแก้ทั้งชื่อและรหัส)
+  function editRowCount(edits){
+    var s={},n=0;
+    edits.forEach(function(e){ if(!s[e.row]){ s[e.row]=1; n++; } });
+    return n;
+  }
+
+  function applyMain(d, done){
+    var edits=mainEdits(mainRows, d);
+    if(!api.ready || !edits.length){ if(done) done(0, edits.length); return; }
+    sync.main={ busy:true, bad:false, msg:'กำลังแก้ข้อมูลในแผ่นรายงาน...' }; paintSync();
+    post({ action:'applymain', key:api.key, fixId:d.id, title:d.title||'', by:d.by||'', edits:edits },
+      function(){ verifyMain(edits, 0, done); });
+  }
+  // ยิงแบบ no-cors อ่านผลไม่ได้ จึงดึงข้อมูลกลับมาดูเองว่าช่องนั้นเปลี่ยนจริงไหม
+  function verifyMain(edits, round, done){
+    jsonpGet({ key:api.key }, function(res){
+      var rows=(res && res.result==='OK' && res.rows) ? res.rows : null;
+      if(!rows){
+        if(round>=2){ sync.main={ busy:false, bad:true, msg:'ตรวจผลการแก้แผ่นรายงานไม่ได้ ลองรีเฟรชหน้า' }; paintSync(); if(done) done(0, edits.length); return; }
+        setTimeout(function(){ verifyMain(edits, round+1, done); }, 1500*(round+1)); return;
+      }
+      var byRow={};
+      rows.forEach(function(r){ if(r._row) byRow[r._row]=r; });
+      var left=edits.filter(function(e){
+        var r=byRow[e.row];
+        if(!r) return false;   // แถวนั้นไม่อยู่แล้ว (ครูกดส่งใบเดิมซ้ำ) ไม่นับว่าค้าง
+        return String(r[e.col]==null?'':r[e.col])!==String(e.to);
+      });
+      if(left.length && round<2){ setTimeout(function(){ verifyMain(edits, round+1, done); }, 1500*(round+1)); return; }
+      sync.main={ busy:false, bad:!!left.length,
+        msg: left.length ? ('แก้ในแผ่นรายงานไม่ครบ เหลือ '+left.length+' ช่อง กดปุ่มแก้ซ้ำอีกครั้งได้')
+                         : ('แก้ในแผ่นรายงานแล้ว '+edits.length+' ช่อง') };
+      paintSync();
+      if(api.onRows) api.onRows(rows, res.fixes);   // ให้หน้ารายงานอัปเดตตารางตามข้อมูลใหม่
+      if(done) done(edits.length-left.length, edits.length);
+    });
+  }
+
+  // ย้อนกลับ — หลังบ้านอ่านจากแผ่น "ค่าเดิม" เอง ฝั่งนี้แค่สั่งแล้วดึงข้อมูลใหม่มาแสดง
+  function undoMain(id, done){
+    if(!api.ready){ if(done) done(); return; }
+    sync.main={ busy:true, bad:false, msg:'กำลังย้อนข้อมูลในแผ่นรายงาน...' }; paintSync();
+    post({ action:'undomain', key:api.key, fixId:id }, function(){
+      setTimeout(function(){
+        jsonpGet({ key:api.key }, function(res){
+          var ok=(res && res.result==='OK' && res.rows);
+          sync.main={ busy:false, bad:!ok, msg: ok?'ย้อนข้อมูลในแผ่นรายงานแล้ว':'ตรวจผลการย้อนไม่ได้ ลองรีเฟรชหน้า' };
+          paintSync();
+          if(ok && api.onRows) api.onRows(res.rows, res.fixes);
+          if(done) done();
+        });
+      }, 1200);
+    });
   }
 
   var flushing=false, dirty=false;
@@ -473,6 +589,7 @@
 
   function apply(rows){
     if(!COL || !rows || !rows.length) return rows;
+    mainRows=rows;   // จำไว้ใช้ตอนคำนวณช่องที่ต้องแก้ในแผ่น "รายงาน"
     restore(rows);
     var merges=decisions.filter(function(d){ return d.action==='merge'; });
     if(!merges.length) return rows;
@@ -581,6 +698,12 @@
   /* ---------- แถบบอกสถานะการบันทึกลงชีต ----------
      ยิงแบบ no-cors อ่านผลไม่ได้ ถ้าไม่บอกสถานะไว้ ผู้ใช้จะเข้าใจว่าบันทึกแล้วทั้งที่ยังไม่ถึงชีต
      ------------------------------------------------- */
+  // สถานะการแก้แผ่น "รายงาน" — แยกบรรทัดจากสถานะการบันทึกผลการตัดสิน เพราะเป็นคนละแผ่นคนละเรื่อง
+  function mainHTML(){
+    var m=sync.main; if(!m || !m.msg) return '';
+    var cls=m.busy?'fx-sync-busy':(m.bad?'fx-sync-bad':'fx-sync-ok');
+    return '<div class="fx-sync '+cls+'">'+esc(m.msg)+'</div>';
+  }
   function syncHTML(){
     if(!api.url) return '';
     if(!api.ready){
@@ -598,9 +721,66 @@
   // อัปเดตเฉพาะแถบสถานะ ไม่วาดแผงใหม่ทั้งอัน — วาดใหม่ตอนกำลังพิมพ์อยู่จะทำให้ช่องค้นหาหลุดโฟกัส
   function paintSync(){
     var el=document.getElementById('fxSync'); if(!el) return;
-    el.innerHTML=syncHTML();
+    el.innerHTML=syncHTML()+mainHTML();
     var r=document.getElementById('fxRetry');
     if(r) r.addEventListener('click', function(){ flush(); });
+  }
+
+  /* ---------- กล่องยืนยันก่อนเปลี่ยนข้อมูล ----------
+     ทุกปุ่มที่แตะข้อมูลจริงต้องผ่านกล่องนี้ก่อน — แผ่น "รายงาน" คือของที่ครูเอาไปทำงานต่อ
+     กดพลาดแล้วมารู้ทีหลังเสียเวลากว่าการกดยืนยันเพิ่มอีกครั้งเยอะ
+     ------------------------------------------------- */
+  function confirmBox(opt, onYes){
+    var wrap=document.createElement('div');
+    wrap.className='fx-cfm';
+    wrap.innerHTML='<div class="fx-cfm-box">'
+      + '<div class="fx-cfm-head">'+esc(opt.title)+'</div>'
+      + '<div class="fx-cfm-body">'+opt.body+'</div>'
+      + '<div class="fx-cfm-act">'
+      + '<button type="button" class="fx-btn fx-no" data-a="no">ยกเลิก</button>'
+      + '<button type="button" class="fx-btn'+(opt.danger?' fx-danger':'')+'" data-a="yes">'+esc(opt.yes||'ยืนยัน')+'</button>'
+      + '</div></div>';
+    document.body.appendChild(wrap);
+    function close(){ if(wrap.parentNode) wrap.parentNode.removeChild(wrap); }
+    wrap.addEventListener('click', function(e){
+      if(e.target===wrap){ close(); return; }               // กดพื้นหลัง = ยกเลิก
+      var b=e.target.closest && e.target.closest('[data-a]');
+      if(!b) return;
+      close();
+      if(b.getAttribute('data-a')==='yes') onYes();
+    });
+  }
+
+  function valText(v){ return (v && typeof v==='object') ? (v.name+' ('+v.code+')') : String(v==null?'':v); }
+  function cfmRow(label, val){ return '<div class="fx-cfm-row"><span>'+esc(label)+'</span><b>'+esc(val)+'</b></div>'; }
+
+  // กล่องยืนยันสำหรับ "ใช้ค่านี้" — บอกให้ครบว่าจะทับอะไร เป็นอะไร กี่ช่อง กี่แถว
+  function askMerge(it, val, onGo){
+    var d={ id:it.id, type:it.type, action:'merge', value:val, members:it.members||[] };
+    var edits=mainEdits(mainRows, d);
+    var froms={}, list=[];
+    edits.forEach(function(e){ var k=String(e.from); if(k && !froms[k]){ froms[k]=1; list.push(k); } });
+    var body=cfmRow('หัวข้อ', it.title||'')
+      + cfmRow('เปลี่ยนเป็น', valText(val))
+      + (list.length?cfmRow('ทับค่าเดิม', list.join(' · ')):'')
+      + cfmRow('กระทบในแผ่นรายงาน', edits.length+' ช่อง · '+editRowCount(edits)+' แถว');
+    body += edits.length
+      ? '<div class="fx-cfm-warn">ข้อมูลในแผ่น <b>รายงาน</b> จะถูกเปลี่ยนจริง (ไม่มีการลบแถว) ย้อนกลับได้ที่แท็บ <b>แก้ไปแล้ว</b></div>'
+      : '<div class="fx-cfm-warn">ไม่มีช่องไหนต้องเปลี่ยนในแผ่นรายงาน บันทึกไว้เป็นผลการตรวจอย่างเดียว</div>';
+    confirmBox({ title:'ยืนยันการแก้ข้อมูล', body:body, yes:'ยืนยัน แก้เลย', danger:!!edits.length }, onGo);
+  }
+
+  // กล่องยืนยันสำหรับ "ยกเลิกการตัดสิน" — ย้อนค่าในแผ่นรายงานกลับด้วย
+  function askUndo(it, after){
+    var d=it.decision||findDecision(it.id)||{};
+    var body=cfmRow('หัวข้อ', it.title||'')
+      + (d.action==='merge'?cfmRow('ค่าที่ใช้อยู่', valText(d.value)):'')
+      + '<div class="fx-cfm-warn">ยกเลิกแล้วระบบจะ<b>ย้อนค่าในแผ่นรายงานกลับเป็นของเดิม</b> ตามที่จดไว้ในแผ่น <b>ค่าเดิม</b> '
+      + 'ช่องที่มีคนไปแก้มือทีหลังจะไม่ถูกแตะ</div>';
+    confirmBox({ title:'ยืนยันการยกเลิก', body:body, yes:'ยืนยัน ย้อนกลับ', danger:true }, function(){
+      FIXESAPI.undo(it.id);
+      if(after) after();
+    });
   }
 
   // สลับระหว่างโหมด "ระบบตรวจพบ" กับ "แก้เอง"
@@ -611,6 +791,8 @@
       + '<button type="button" class="fx-mode'+(panelMode==='auto'?' on':'')+'" data-m="auto">ระบบตรวจพบ'
       + (res.counts.pending?' <span class="fx-count">'+res.counts.pending+'</span>':'')+'</button>'
       + '<button type="button" class="fx-mode'+(panelMode==='manual'?' on':'')+'" data-m="manual">แก้เอง</button>'
+      + '<button type="button" class="fx-mode'+(panelMode==='done'?' on':'')+'" data-m="done">แก้ไปแล้ว'
+      + (decisions.length?' <span class="fx-count fx-count-done">'+decisions.length+'</span>':'')+'</button>'
       + '<span class="fx-who">ผู้ตรวจ <input type="text" id="fxWho" placeholder="ชื่อผู้ตรวจ" value="'+esc(lastWho)+'"></span>'
       + '<div class="fx-syncwrap" id="fxSync">'+syncHTML()+'</div>'
       + '</div><div id="fxInner"></div>';
@@ -623,6 +805,7 @@
     if(who) who.addEventListener('input', function(){ lastWho=this.value; });
     var inner=document.getElementById('fxInner');
     if(panelMode==='manual') renderManual(inner, rows, function(){ if(onChange) onChange(); });
+    else if(panelMode==='done') renderDone(inner, rows, onChange, box);
     else renderAuto(inner, rows, onChange, box);
     syncStickyTop(box);
   }
@@ -640,15 +823,9 @@
   var autoFilter='';
   function renderAuto(box, rows, onChange, outer){
     var res=detect(rows);
-    var pending=res.items.filter(function(i){ return !i.decision; });
-    // รายการที่ตัดสินไปแล้วต้องอ่านจากบันทึกการตัดสินโดยตรง ไม่ใช่จากผลตรวจ
-    // เพราะพอแก้ข้อมูลแล้วตัวตรวจจับจะไม่เจอปัญหานั้นอีก การ์ดจะหายไปทั้งที่ควรเห็นไว้ย้อนดูและกดยกเลิกได้
-    var doneList=decisions.map(function(d){
-      return { id:d.id, type:d.type, level:'high', title:d.title||d.id,
-               reason:(d.action==='merge'?'แก้ไขแล้ว':'ทำเครื่องหมายว่าไม่ต้องแก้'),
-               options:[], members:d.members||[], decision:d, cls:'' };
-    });
-    var ordered=pending.concat(doneList);
+    // แท็บนี้เหลือเฉพาะ "ที่ยังไม่ได้ตัดสิน" — ที่ตัดสินไปแล้วย้ายไปอยู่แท็บ "แก้ไปแล้ว" ของตัวเอง
+    // เดิมเอาไปต่อท้ายรายการเดียวกัน พอตัดสินไปเยอะ ต้องเลื่อนยาวมากกว่าจะเจอของที่ยังไม่ได้ทำ
+    var ordered=res.items.filter(function(i){ return !i.decision; });
 
     // ชิปด้านบนกดกรองได้ — ไม่งั้นกว่าจะถึงการ์ดวิชาต้องเลื่อนผ่านการ์ดชื่อทั้งหมด
     var chip=function(key,label,n){
@@ -680,7 +857,7 @@
       var redraw=function(){ if(onChange) onChange(); renderPanel(outer||box, rows, onChange); };
 
       var undo=card.querySelector('.fx-undo');
-      if(undo) undo.addEventListener('click', function(){ removeDecision(it.id); redraw(); });
+      if(undo) undo.addEventListener('click', function(){ askUndo(it, redraw); });
 
       var ok=card.querySelector('.fx-ok');
       if(ok) ok.addEventListener('click', function(){
@@ -704,19 +881,66 @@
         } else {
           val=it.options[+(sel?sel.value:0)].value;
         }
-        FIXESAPI.decide(it,'merge',val,(document.getElementById('fxWho')||{}).value);
-        redraw();
+        askMerge(it, val, function(){
+          FIXESAPI.decide(it,'merge',val,(document.getElementById('fxWho')||{}).value);
+          redraw();
+        });
       });
 
       var no=card.querySelector('.fx-no');
       if(no) no.addEventListener('click', function(){
-        FIXESAPI.decide(it,'ignore',null,(document.getElementById('fxWho')||{}).value);
-        redraw();
+        confirmBox({ title:'ยืนยันว่าไม่ต้องแก้', yes:'ยืนยัน',
+          body:cfmRow('หัวข้อ', it.title||'')
+             + '<div class="fx-cfm-warn">บันทึกไว้ว่าตรวจแล้วไม่ต้องแก้ ข้อมูลในแผ่นรายงานไม่ถูกแตะ</div>'
+        }, function(){
+          FIXESAPI.decide(it,'ignore',null,(document.getElementById('fxWho')||{}).value);
+          redraw();
+        });
       });
     });
   }
   var lastWho='';
   var manualKind='student';   // แท็บย่อยในโหมดแก้เอง: student / teacher / subject
+
+  /* ---------- แท็บ "แก้ไปแล้ว" ----------
+     สร้างจากบันทึกการตัดสินโดยตรง ไม่ใช่จากผลตรวจ
+     เพราะพอแก้ข้อมูลแล้วตัวตรวจจับจะไม่เห็นปัญหานั้นอีก การ์ดจะหายไปทั้งที่ควรเห็นไว้ย้อนดูและกดยกเลิกได้
+     ------------------------------------------------- */
+  var doneFilter='';
+  function doneItems(){
+    return decisions.map(function(d){
+      return { id:d.id, type:d.type, level:'high', title:d.title||d.id,
+               reason:(d.action==='merge'?('แก้เป็น '+valText(d.value)):'ทำเครื่องหมายว่าไม่ต้องแก้'),
+               options:[], members:d.members||[], decision:d, cls:'' };
+    });
+  }
+  function renderDone(box, rows, onChange, outer){
+    var all=doneItems();
+    var n=function(t){ return all.filter(function(x){ return x.type===t; }).length; };
+    var chip=function(key,label,c){
+      return '<button type="button" class="fx-chip'+(doneFilter===key?' on':'')+'" data-f="'+key+'">'+label+' <b>'+c+'</b></button>';
+    };
+    var list=doneFilter?all.filter(function(x){ return x.type===doneFilter; }):all;
+    var h='<div class="fx-top">'
+      + '<span class="fx-sum">แก้ไปแล้ว <b>'+all.length+'</b> รายการ</span>'
+      + chip('','ทั้งหมด',all.length) + chip('name','ชื่อนักเรียน',n('name'))
+      + chip('teacher','ชื่อครู',n('teacher')) + chip('room','ห้อง',n('room')) + chip('subject','วิชา',n('subject'))
+      + '</div>';
+    h+= list.length ? list.map(function(it,i){ return cardHTML(it,i); }).join('')
+                    : '<div class="fx-empty">'+(doneFilter?'ไม่มีรายการในหมวดนี้':'ยังไม่ได้แก้อะไร')+'</div>';
+    box.innerHTML=h;
+
+    box.querySelectorAll('.fx-chip').forEach(function(b){
+      b.addEventListener('click', function(){ doneFilter=this.getAttribute('data-f'); renderDone(box, rows, onChange, outer); });
+    });
+    box.querySelectorAll('.fx-card').forEach(function(card){
+      var it=list[+card.getAttribute('data-idx')];
+      var undo=card.querySelector('.fx-undo');
+      if(undo) undo.addEventListener('click', function(){
+        askUndo(it, function(){ if(onChange) onChange(); renderPanel(outer||box, rows, onChange); });
+      });
+    });
+  }
 
   /* ---------- โหมดแก้เอง ----------
      สำหรับกรณีที่ตัวตรวจจับมองไม่เห็น เช่น ชื่อสะกดต่างกันเยอะเกินไป
@@ -850,36 +1074,57 @@
         var v1=(document.getElementById('fxV1')||{}).value||'';
         var v2=(document.getElementById('fxV2')||{}).value||'';
         v1=v1.replace(/\s+/g,' ').trim();
+        var now=new Date().toISOString();
+        var bad=function(m){
+          var old=edit.querySelector('.fx-err'); if(old) old.remove();
+          edit.querySelector('.fx-actions').insertAdjacentHTML('beforeend','<div class="fx-err">'+esc(m)+'</div>');
+        };
+        // ตรวจให้ครบก่อน แล้วค่อยรวบเป็นรายการเดียว — กดครั้งเดียวอาจได้ทั้งชื่อและห้อง
+        // ต้องผ่านกล่องยืนยันก่อนถึงจะเขียนอะไรลงชีต ห้ามเขียนทีละอันระหว่างตรวจ
+        var pend=[];
 
         if(manualKind==='subject'){
           var cd=v2.replace(/\s+/g,'').trim();
-          if(!v1 || !cd){ edit.querySelector('.fx-actions').insertAdjacentHTML('beforeend','<div class="fx-err">กรอกชื่อวิชาและรหัสให้ครบก่อน</div>'); return; }
-          putDecision({ id:'manual:subject:'+sel.map(function(x){return x.key;}).sort().join('||'), type:'subject', action:'merge',
-            value:{name:v1, code:cd}, members:sel.map(function(x){ return x.key; }), title:v1, by:by, at:new Date().toISOString() });
+          if(!v1 || !cd){ bad('กรอกชื่อวิชาและรหัสให้ครบก่อน'); return; }
+          pend.push({ id:'manual:subject:'+sel.map(function(x){return x.key;}).sort().join('||'), type:'subject', action:'merge',
+            value:{name:v1, code:cd}, members:sel.map(function(x){ return x.key; }), title:v1, by:by, at:now });
         } else if(manualKind==='teacher'){
-          if(!v1){ edit.querySelector('.fx-actions').insertAdjacentHTML('beforeend','<div class="fx-err">กรอกชื่อครูก่อน</div>'); return; }
-          putDecision({ id:'manual:teacher:'+sel.map(function(x){return x.key;}).sort().join('||'), type:'teacher', action:'merge',
-            value:v1, members:sel.map(function(x){ return x.key; }), title:v1, by:by, at:new Date().toISOString() });
+          if(!v1){ bad('กรอกชื่อครูก่อน'); return; }
+          pend.push({ id:'manual:teacher:'+sel.map(function(x){return x.key;}).sort().join('||'), type:'teacher', action:'merge',
+            value:v1, members:sel.map(function(x){ return x.key; }), title:v1, by:by, at:now });
         } else {
-          if(!v1){ edit.querySelector('.fx-actions').insertAdjacentHTML('beforeend','<div class="fx-err">กรอกชื่อนักเรียนก่อน</div>'); return; }
+          if(!v1){ bad('กรอกชื่อนักเรียนก่อน'); return; }
           var members=sel.map(function(x){ return x.label; });   // ชื่อดิบทั้งหมดที่เลือก
           // บันทึกเรื่องชื่อเฉพาะเมื่อมีอะไรเปลี่ยนจริง — เลือกคนเดียวแล้วชื่อเท่าเดิม (ตั้งใจมาแก้แค่ห้อง) ไม่ต้องบันทึก
           if(sel.length>1 || v1!==sel[0].label){
-            putDecision({ id:'manual:name:'+members.slice().sort().join('||'), type:'name', action:'merge',
-              value:v1, members:members, title:v1, by:by, at:new Date().toISOString() });
+            pend.push({ id:'manual:name:'+members.slice().sort().join('||'), type:'name', action:'merge',
+              value:v1, members:members, title:v1, by:by, at:now });
           }
           var room=v2.replace(/\s+/g,'').trim();
           if(sel.length===1 && room===sel[0].extra) room='';   // ห้องเท่าเดิม = ไม่ได้ตั้งใจแก้ห้อง
           if(room){
-            if(!/^ม\.?\d\/\d+$/.test(room)){ edit.querySelector('.fx-actions').insertAdjacentHTML('beforeend','<div class="fx-err">กรอกห้องในรูปแบบ ม.6/4</div>'); return; }
+            if(!/^ม\.?\d\/\d+$/.test(room)){ bad('กรอกห้องในรูปแบบ ม.6/4'); return; }
             if(room.indexOf('ม.')!==0) room=room.replace('ม','ม.');
             // ห้องผูกกับตัวนักเรียน จึงใช้คีย์เสียงของชื่อที่แก้แล้วเป็นสมาชิก
-            putDecision({ id:'manual:room:'+nameKey(v1), type:'room', action:'merge', value:room,
-              members:[nameKey(v1)].concat(sel.map(function(x){ return x.nameKey; })), title:v1, by:by, at:new Date().toISOString() });
+            pend.push({ id:'manual:room:'+nameKey(v1), type:'room', action:'merge', value:room,
+              members:[nameKey(v1)].concat(sel.map(function(x){ return x.nameKey; })), title:v1, by:by, at:now });
           }
         }
-        if(onChange) onChange();
-        renderManual(box, rows, onChange);
+        if(!pend.length){ bad('ยังไม่ได้เปลี่ยนอะไร'); return; }
+
+        var edits=[];
+        pend.forEach(function(d){ edits=edits.concat(mainEdits(mainRows, d)); });
+        var body=cfmRow('รายการที่เลือก', sel.map(function(x){ return x.label; }).join(' · '))
+          + pend.map(function(d){ return cfmRow(LABEL[d.type]+'ที่ถูก', valText(d.value)); }).join('')
+          + cfmRow('กระทบในแผ่นรายงาน', edits.length+' ช่อง · '+editRowCount(edits)+' แถว')
+          + (edits.length
+              ? '<div class="fx-cfm-warn">ข้อมูลในแผ่น <b>รายงาน</b> จะถูกเปลี่ยนจริง (ไม่มีการลบแถว) ย้อนกลับได้ที่แท็บ <b>แก้ไปแล้ว</b></div>'
+              : '<div class="fx-cfm-warn">ไม่มีช่องไหนต้องเปลี่ยนในแผ่นรายงาน บันทึกไว้เป็นผลการตรวจอย่างเดียว</div>');
+        confirmBox({ title:'ยืนยันการแก้ข้อมูล', body:body, yes:'ยืนยัน แก้เลย', danger:!!edits.length }, function(){
+          pend.forEach(function(d){ putDecision(d); applyMain(d); });
+          if(onChange) onChange();
+          renderManual(box, rows, onChange);
+        });
       });
     }
     box.querySelectorAll('.fx-mcheck').forEach(function(c){ c.addEventListener('change', drawEdit); });
@@ -903,7 +1148,7 @@
     // (เวอร์ชันเก่าคืนมาแต่ rows ไม่มีช่อง fixes เลย)
     connect:function(o){
       ensureLoaded();
-      api.url=o.url||''; api.key=o.key||'';
+      api.url=o.url||''; api.key=o.key||''; api.onRows=o.onRows||null;
       api.ready=(Object.prototype.toString.call(o.fixes)==='[object Array]');
       if(api.ready) setServer(o.fixes);
       flush();   // ส่งของที่ค้างจากคราวก่อน (หรือที่ย้ายมาจากที่เก็บเดิม) ขึ้นชีตให้
@@ -920,13 +1165,16 @@
     unsent:function(){ return queue.length; },   // จำนวนรายการที่ยังยืนยันไม่ได้ว่าถึงชีต
     retry:function(){ flush(); },
     decide:function(item, action, value, by){
-      putDecision({
+      var d={
         id:item.id, type:item.type, action:action, value:value,
         members:item.members, title:item.title,
         by:(by||'').trim(), at:new Date().toISOString()
-      });
+      };
+      putDecision(d);                      // 1) จดผลการตัดสินไว้ที่แผ่น "แก้ข้อมูล"
+      if(action==='merge') applyMain(d);   // 2) แก้ข้อมูลจริงในแผ่น "รายงาน"
     },
-    undo:removeDecision,
+    // ยกเลิก = ลบผลการตัดสิน แล้วย้อนค่าในแผ่น "รายงาน" กลับจากแผ่น "ค่าเดิม"
+    undo:function(id){ removeDecision(id); undoMain(id); },
     // เปิดออกมาให้ report.js และการทดสอบเรียกใช้ได้
     util:{ baseName:baseName, phonetic:phonetic, nameKey:nameKey, lev:lev, hasStuckPrefix:hasStuckPrefix, CODE_OK:CODE_OK }
   };

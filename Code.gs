@@ -152,6 +152,116 @@ function saveFix(data) {
   }
 }
 
+// ====================================================
+// แผ่น "ค่าเดิม" — สมุดสำรองก่อนแก้แผ่น "รายงาน"
+// ====================================================
+// ⚠️ ห้ามเก็บค่าเดิมไว้ในแผ่น "รายงาน" เด็ดขาด (เช่นเพิ่มคอลัมน์ที่ 23)
+//    เพราะครูเอาแผ่นนั้นไปทำงานต่อ คอลัมน์แปลกปลอมจะไปพังของเขา
+//    เก็บแยกแผ่นนี้แทน ทำให้ย้อนกลับได้โดยแผ่นรายงานยังหน้าตาเดิมเป๊ะ 22 คอลัมน์
+var BACKUP_SHEET = 'ค่าเดิม';
+var BACKUP_HEADERS = ['เวลา', 'id การแก้', 'หัวข้อ', 'แถวในชีต', 'คอลัมน์', 'ค่าเดิม', 'ค่าใหม่', 'ผู้ตรวจ', 'สถานะ'];
+
+// คอลัมน์ที่ยอมให้แก้ได้เท่านั้น (ชื่อ -> เลขคอลัมน์ในแผ่น "รายงาน" นับจาก 1)
+// ทำเป็นรายชื่อขาว: ส่งชื่อคอลัมน์อื่นมาเท่ากับถูกปฏิเสธ ไม่ว่าจะพลาดหรือจงใจ
+// ห้ามใส่ timestamp / submission_id / ตัวเลขคาบเรียน เข้ามาในนี้
+var MAIN_EDITABLE = {
+  'คำนำหน้าครู': 3, 'ชื่อครู': 4, 'รหัสวิชา': 6, 'ชื่อรายวิชา': 7, 'ชื่อ-สกุล': 15, 'ชั้น/ห้อง': 16
+};
+
+function getBackupSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(BACKUP_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(BACKUP_SHEET);
+    sh.appendRow(BACKUP_HEADERS);
+    var head = sh.getRange(1, 1, 1, BACKUP_HEADERS.length);
+    head.setFontWeight('bold');
+    head.setBackground('#6b21a8');
+    head.setFontColor('#ffffff');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+// ===== แก้ข้อมูลในแผ่น "รายงาน" จริง =====
+// 🚨 แก้เฉพาะ "ค่าในช่อง" เท่านั้น ห้ามลบแถว ห้ามเพิ่มแถว ห้ามสลับลำดับ เด็ดขาด
+//    ในนี้จึงมีแต่ setValue ทีละช่อง ไม่มี deleteRow / insertRow / setValues ทั้งแผ่น
+// ทุกช่องต้องผ่าน 3 ด่าน: คอลัมน์อยู่ในรายชื่อขาว · เลขแถวอยู่ในช่วงจริง · ค่าปัจจุบันตรงกับที่ฝั่งเว็บเห็น
+// ด่านที่ 3 สำคัญที่สุด — ถ้าชีตถูกแก้ไปแล้วระหว่างทาง (ครูกดส่งใบเดิมซ้ำ แถวจึงเลื่อน) จะข้ามไป ไม่ทับมั่ว
+function applyMainEdits(data) {
+  var edits = (data && data.edits) || [];
+  if (!edits.length) return { result: 'OK', changed: 0, skipped: 0 };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);   // ใช้ล็อกตัวเดียวกับ saveToSheet — กันเขียนชนกับตอนครูกดส่งใบ
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('รายงาน');
+    if (!sheet || sheet.getLastRow() < 2) throw new Error('ไม่มีข้อมูลในแผ่นรายงาน');
+    var values = sheet.getDataRange().getValues();
+    var now = new Date(), log = [], changed = 0, skipped = 0;
+
+    for (var i = 0; i < edits.length; i++) {
+      var e = edits[i] || {};
+      var col = MAIN_EDITABLE[String(e.col)];
+      var row = parseInt(e.row, 10);
+      if (!col) { skipped++; continue; }                          // คอลัมน์ไม่อยู่ในรายชื่อขาว
+      if (!(row >= 2) || row > values.length) { skipped++; continue; }  // แถว 1 คือหัวตาราง ห้ามแตะ
+      var cur = String(values[row - 1][col - 1]);
+      if (cur !== String(e.from)) { skipped++; continue; }         // ชีตไม่ตรงกับที่เว็บเห็น ไม่ทับ
+      if (cur === String(e.to)) { skipped++; continue; }           // เหมือนเดิมอยู่แล้ว ไม่ต้องเขียน
+
+      sheet.getRange(row, col).setValue(String(e.to));
+      values[row - 1][col - 1] = String(e.to);                     // กันแก้ช่องเดิมซ้ำในรอบเดียวกัน
+      log.push([now, String(data.fixId || ''), String(data.title || ''), row,
+                String(e.col), cur, String(e.to), String(data.by || ''), '']);
+      changed++;
+    }
+
+    if (log.length) {
+      var bk = getBackupSheet_();
+      bk.getRange(bk.getLastRow() + 1, 1, log.length, BACKUP_HEADERS.length).setValues(log);
+    }
+    return { result: 'OK', changed: changed, skipped: skipped };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ===== ย้อนการแก้กลับเป็นค่าเดิม =====
+// อ่านจากแผ่น "ค่าเดิม" เฉพาะรายการของ id นี้ที่ยังไม่ถูกย้อน แล้วเขียนค่าเดิมกลับ
+// เขียนกลับต่อเมื่อค่าปัจจุบันยังเป็น "ค่าใหม่" อยู่ — ถ้ามีคนไปแก้มือทีหลัง จะไม่ไปทับของเขา
+// ไม่ลบแถวใน "ค่าเดิม" แต่ประทับสถานะไว้ ประวัติจึงยังอยู่ครบ
+function undoMainEdits(data) {
+  var id = String((data && data.fixId) || '');
+  if (!id) return { result: 'OK', restored: 0, skipped: 0 };
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var bk = getBackupSheet_();
+    if (bk.getLastRow() < 2) return { result: 'OK', restored: 0, skipped: 0 };
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('รายงาน');
+    if (!sheet || sheet.getLastRow() < 2) throw new Error('ไม่มีข้อมูลในแผ่นรายงาน');
+    var values = sheet.getDataRange().getValues();
+    var logs = bk.getDataRange().getValues();
+    var restored = 0, skipped = 0;
+
+    for (var r = logs.length - 1; r >= 1; r--) {
+      if (String(logs[r][1]) !== id) continue;
+      if (String(logs[r][8])) continue;                            // ย้อนไปแล้ว ข้าม
+      var col = MAIN_EDITABLE[String(logs[r][4])];
+      var row = parseInt(logs[r][3], 10);
+      if (!col || !(row >= 2) || row > values.length) { skipped++; continue; }
+      if (String(values[row - 1][col - 1]) !== String(logs[r][6])) { skipped++; continue; }
+      sheet.getRange(row, col).setValue(String(logs[r][5]));
+      values[row - 1][col - 1] = String(logs[r][5]);
+      bk.getRange(r + 1, 9).setValue('ย้อนแล้ว');
+      restored++;
+    }
+    return { result: 'OK', restored: restored, skipped: skipped };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ห่อผลลัพธ์เป็น JSONP — เลี่ยงปัญหา CORS เวลาเรียกข้ามโดเมน (Netlify -> Apps Script)
 function jsonp(callback, obj) {
   return ContentService
@@ -175,6 +285,9 @@ function readSheet() {
       if (v instanceof Date) v = v.toISOString(); // แปลงวันที่เป็น ISO string ให้ฝั่งเว็บ parse ได้
       obj[FIELDS[c]] = (v===undefined ? '' : v);
     }
+    // เลขแถวจริงในชีต — ฝั่งเว็บใช้ระบุว่าจะให้แก้ช่องไหน ตอนสั่งแก้แผ่น "รายงาน"
+    // ส่งคู่กับค่าเดิมเสมอ ฝั่งนี้จึงตรวจได้ว่าแถวยังตรงกันอยู่ก่อนเขียนทับ
+    obj._row = r + 1;
     out.push(obj);
   }
   return out;
@@ -196,6 +309,17 @@ function doPost(e) {
       saveFix(data.fix || data);
       return ContentService
         .createTextOutput(JSON.stringify({ result: 'OK' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ===== แก้ข้อมูลในแผ่น "รายงาน" จริง / ย้อนกลับ (ต้องมีรหัสผ่านเหมือนกัน) =====
+    if (data.action === 'applymain' || data.action === 'undomain') {
+      var props3 = PropertiesService.getScriptProperties();
+      var pass3 = props3.getProperty('REPORT_PASSWORD') || DEFAULT_REPORT_PASSWORD;
+      if (String(data.key || '') !== String(pass3)) throw new Error('unauthorized');
+      var res = (data.action === 'applymain') ? applyMainEdits(data) : undoMainEdits(data);
+      return ContentService
+        .createTextOutput(JSON.stringify(res))
         .setMimeType(ContentService.MimeType.JSON);
     }
 
