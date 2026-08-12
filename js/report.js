@@ -97,21 +97,59 @@
     });
   }
 
-  // ====== JSONP (เลี่ยง CORS) ======
+  // ====== JSONP (เลี่ยง CORS) + ลองใหม่อัตโนมัติเมื่อเน็ตสะดุด ======
+  // ที่ต้องมีการลองใหม่: บนเครื่องจริงเจอว่าคำขอแรก ๆ ล้มด้วย ERR_NAME_NOT_RESOLVED
+  // (เบราว์เซอร์แปลชื่อ script.google.com ไม่ได้ชั่วขณะ — Edge/Safari ใช้ DNS คนละชุดกับ Chrome จึงสะดุดบ่อยกว่า)
+  // และ ERR_NETWORK_CHANGED แต่ครั้งถัดมามักสำเร็จ
+  // ของเดิมรอ 20 วิแล้วยอมแพ้ทันทีโดยไม่ลองใหม่ ทั้งที่ข้อมูลกลับมาถึงจริงหลังจากนั้น
+  // (เห็นเป็น "callback is not defined" ในคอนโซล = ตอบกลับมาแล้วแต่ไม่มีใครรออยู่)
+  // อาการจึงกลายเป็น "เข้าไม่ได้ถาวร" ทั้งที่ความจริงคือ "ต้องลองอีกที"
   var jsonpId=0;
-  function jsonp(params, cb){
+  var NET_TIMEOUT=45000;   // รอต่อครั้ง — ชีตโตขึ้นและหลังบ้านอ่าน 2 แผ่นต่อครั้ง 20 วิไม่พออีกแล้ว
+  var NET_RETRIES=2;       // ลองซ้ำอีก 2 ครั้ง (รวมเป็น 3) เว้นระยะ 1 แล้ว 2 วินาที
+
+  function jsonp(params, cb, opts){
+    opts=opts||{};
+    var maxTry=((opts.retries==null)?NET_RETRIES:opts.retries)+1, attempt=0;
+    function go(){
+      attempt++;
+      if(opts.onTry) opts.onTry(attempt, maxTry);
+      once(params, function(data){
+        var netFail=data && data.error && (data.error==='network' || data.error==='timeout');
+        if(netFail && attempt<maxTry){ setTimeout(go, Math.pow(2, attempt-1)*1000); return; }
+        if(data) data.tries=attempt;
+        cb(data);
+      });
+    }
+    go();
+  }
+
+  // ยิงจริง 1 ครั้ง
+  function once(params, cb){
     jsonpId++;
     var name='__cb'+jsonpId+'_'+(new Date().getTime());
     var s=document.createElement('script');
     var done=false, timer=null;
     window[name]=function(data){ done=true; cleanup(); cb(data); };
-    function cleanup(){ if(timer) clearTimeout(timer); try{ delete window[name]; }catch(e){ window[name]=undefined; } if(s.parentNode) s.parentNode.removeChild(s); }
+    // กันคอนโซลขึ้น "callback is not defined" ตอนข้อมูลกลับมาช้ากว่ากำหนด — รับไว้เงียบ ๆ แล้วทิ้ง
+    function cleanup(){ if(timer) clearTimeout(timer); try{ window[name]=function(){}; }catch(e){} if(s.parentNode) s.parentNode.removeChild(s); }
     var q=[]; for(var k in params){ q.push(encodeURIComponent(k)+'='+encodeURIComponent(params[k])); }
     q.push('callback='+name);
     s.src=SHEET_URL+'?'+q.join('&');
     s.onerror=function(){ if(!done){ cleanup(); cb({error:'network'}); } };
     document.body.appendChild(s);
-    timer=setTimeout(function(){ if(!done){ cleanup(); cb({error:'timeout'}); } }, 20000);
+    timer=setTimeout(function(){ if(!done){ cleanup(); cb({error:'timeout'}); } }, NET_TIMEOUT);
+  }
+
+  // แปลงความผิดพลาดเป็นข้อความที่บอกได้ว่าติดตรงไหน
+  // ข้อความเดียวว่า "เชื่อมต่อไม่สำเร็จ" ครอบหลายสาเหตุที่คนละเรื่องกัน ทำให้ไล่ปัญหาไม่ได้เลย
+  function netErrorText(data){
+    var e=(data && data.error) || '', n=(data && data.tries) || 1;
+    var tail=(n>1)?(' (ลองแล้ว '+n+' ครั้ง)'):'';
+    if(e==='timeout') return 'เซิร์ฟเวอร์ตอบช้าเกินไป'+tail+' — กดเข้าสู่ระบบอีกครั้ง';
+    if(e==='server')  return 'ระบบหลังบ้านมีปัญหา — แจ้งผู้ดูแลให้ดูที่ Apps Script เมนู Executions';
+    if(e==='network') return 'เครือข่ายขัดข้อง ติดต่อเซิร์ฟเวอร์ไม่ได้'+tail+' — ลองเปลี่ยนเครือข่าย หรือใช้เบราว์เซอร์ Chrome';
+    return 'เชื่อมต่อไม่สำเร็จ'+tail+' — ลองใหม่อีกครั้ง';
   }
 
   // ระบบตรวจสอบข้อมูลเพิ่งแก้แผ่น "รายงาน" ไปจริง แล้วดึงข้อมูลชุดใหม่มาให้ — เอามาใช้แทนของเดิมทั้งชุด
@@ -125,7 +163,7 @@
 
   // ====== Password gate ======
   var gate=document.getElementById('gate'), main=document.getElementById('main');
-  function tryLogin(pass, onFail){
+  function tryLogin(pass, onFail, onTry){
     jsonp({ key:pass }, function(data){
       if(data && data.result==='OK'){
         currentPass=pass;   // เก็บใน memory (หายเมื่อปิด/รีเฟรชหน้า) เพื่อใช้เช็ครายงานใหม่อัตโนมัติ
@@ -138,18 +176,23 @@
       } else if(data && data.error==='unauthorized'){
         onFail('รหัสผ่านไม่ถูกต้อง');
       } else {
-        onFail('เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง');
+        onFail(netErrorText(data));
       }
-    });
+    }, { onTry:onTry });
   }
   document.getElementById('gateBtn').addEventListener('click', function(){
     var p=document.getElementById('gatePass').value.trim();
     var err=document.getElementById('gateErr');
     if(!p){ err.textContent='กรุณากรอกรหัสผ่าน'; return; }
     err.textContent='กำลังตรวจสอบ...';
+    err.className='err wait';
     this.disabled=true;
     var btn=this;
-    tryLogin(p, function(msg){ err.textContent=msg; btn.disabled=false; });
+    tryLogin(p,
+      function(msg){ err.textContent=msg; err.className='err'; btn.disabled=false; },
+      // บอกให้รู้ว่าระบบยังพยายามอยู่ ไม่ได้ค้าง — เน็ตสะดุดครั้งแรกเป็นเรื่องปกติของบางเบราว์เซอร์
+      function(n, max){ if(n>1) err.textContent='เครือข่ายสะดุด กำลังลองใหม่ ครั้งที่ '+n+' จาก '+max+'...'; }
+    );
   });
   document.getElementById('gatePass').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('gateBtn').click(); });
   // ปุ่มแสดง/ซ่อนรหัสผ่าน

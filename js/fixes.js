@@ -144,11 +144,25 @@
 
   /* ---------- คุยกับ Apps Script ---------- */
   // JSONP (ขาอ่าน) — เลี่ยง CORS แบบเดียวกับที่หน้ารายงานใช้ดึงข้อมูลหลัก
+  // ต้องลองใหม่เมื่อเน็ตสะดุดเหมือนกัน: บนเครื่องจริงเจอคำขอแรกล้มด้วย ERR_NAME_NOT_RESOLVED
+  // (เบราว์เซอร์แปลชื่อ script.google.com ไม่ได้ชั่วขณะ) แล้วครั้งถัดมาสำเร็จ
+  var FX_TIMEOUT=45000, FX_RETRIES=2;
   function jsonpGet(params, cb){
+    var attempt=0;
+    (function go(){
+      attempt++;
+      jsonpOnce(params, function(d){
+        if(d==null && attempt<=FX_RETRIES){ setTimeout(go, Math.pow(2, attempt-1)*1000); return; }
+        cb(d);
+      });
+    })();
+  }
+  function jsonpOnce(params, cb){
     var name='__fx'+(new Date().getTime())+'_'+Math.floor(Math.random()*1e9);
     var s=document.createElement('script'), done=false;
-    var timer=setTimeout(function(){ if(!done){ done=true; cleanup(); cb(null); } }, 20000);
-    function cleanup(){ clearTimeout(timer); try{ delete window[name]; }catch(e){ window[name]=undefined; } if(s.parentNode) s.parentNode.removeChild(s); }
+    var timer=setTimeout(function(){ if(!done){ done=true; cleanup(); cb(null); } }, FX_TIMEOUT);
+    // กันคอนโซลขึ้น "callback is not defined" ตอนข้อมูลกลับมาช้ากว่ากำหนด — รับไว้เงียบ ๆ แล้วทิ้ง
+    function cleanup(){ clearTimeout(timer); try{ window[name]=function(){}; }catch(e){} if(s.parentNode) s.parentNode.removeChild(s); }
     window[name]=function(d){ if(done) return; done=true; cleanup(); cb(d); };
     var q=[]; for(var k in params){ q.push(encodeURIComponent(k)+'='+encodeURIComponent(params[k])); }
     q.push('callback='+name);
