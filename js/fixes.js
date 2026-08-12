@@ -36,6 +36,35 @@
   // จะถูกมองว่าเหมือนกันแล้วตั้งแต่แรก ทั้งที่ในชีตยังเก็บต่างกันและยังถูกนับเป็น 2 คน
   function rawName(s){ return String(s==null?'':s).replace(/\s+/g,' ').trim(); }
 
+  // ค่าที่ "ตาเห็นเหมือนกัน" — ล้างทุกอย่างที่มองไม่เห็นทิ้งก่อนเทียบ
+  // 🚨 ตัวนี้เป็นตัวจริงตัวเดียวของทั้งเว็บ report.js เรียกใช้ตัวนี้ (ผ่าน FIXES.visKey) ห้ามเขียนสำเนาซ้ำที่อื่น
+  //    ครูก๊อปชื่อจากไฟล์อื่นมาวางแล้วติดอักขระซ่อนมาด้วยได้ ถ้าไม่ล้างก่อน เด็กคนเดียวจะถูกนับเป็นสองคน
+  // สระบน/ล่างและวรรณยุกต์ไทย พิมพ์สลับลำดับกันได้ หน้าจอออกมาเหมือนกันเป๊ะ แต่ในชีตเป็นคนละค่า
+  // เช่น "กี่" (สระอีก่อน ไม้เอกหลัง) กับ "ก่ี" (ไม้เอกก่อน สระอีหลัง) — ตาแยกไม่ออก
+  // 🚨 normalize('NFC') ช่วยไม่ได้ เพราะยูนิโค้ดไม่จัดลำดับเครื่องหมายไทยให้ (พิสูจน์แล้ว)
+  //    จึงต้องเรียงเครื่องหมายที่เกาะพยัญชนะตัวเดียวกันเองก่อนเทียบ
+  //    ปลอดภัย เพราะภาษาไทยมีลำดับที่ถูกแบบเดียว อีกลำดับคือพิมพ์ผิด ไม่ใช่คนละคำ
+  //    ⚠ ใช้เทียบเท่านั้น ห้ามเอาผลไปแสดงหรือเขียนลงชีต
+  var TH_MARK=/[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/;
+  function thaiOrder(t){
+    var out='', i=0, n=t.length;
+    while(i<n){
+      if(!TH_MARK.test(t.charAt(i))){ out+=t.charAt(i); i++; continue; }
+      var run=[];
+      while(i<n && TH_MARK.test(t.charAt(i))){ run.push(t.charAt(i)); i++; }
+      out+=run.sort().join('');
+    }
+    return out;
+  }
+  function visKey(v){
+    var t=String(v==null?'':v);
+    if(t.normalize) t=t.normalize('NFC');
+    t=t.replace(/[\u200B-\u200D\uFEFF\u2060\u00AD]/g,'')      // อักขระที่ไม่แสดงผลเลย
+       .replace(/[\u00A0\u2000-\u200A\u202F\u3000]/g,' ')   // ช่องว่างพันธุ์แปลก
+       .replace(/\s+/g,' ').trim();
+    return thaiOrder(t);
+  }
+
   // ชั้น 2 — ยุบตัวอักษรที่ออกเสียงเหมือนกันให้เหลือตัวแทนเดียว
   // ภาษาไทยมีตัวที่เสียงเดียวกันแต่เขียนต่างเยอะ ครูคนละคนจึงสะกดชื่อเด็กคนเดียวกันไม่ตรงกัน
   function phonetic(s){
@@ -399,7 +428,10 @@
           // ต้องอยู่ระดับชั้นเดียวกัน ไม่งั้นเป็นคนละคนที่ชื่อบังเอิญคล้ายกัน
           if(classLevel(cls(la[0]))!==classLevel(cls(lb[0]))) continue;
           // นามสกุลต้องเหมือนกัน มิฉะนั้นเป็นคนละคน (เช่น ฐิติกร กับ ณัฎฐภัทร จันทร์มลต์ = พี่น้อง)
-          if(phonetic(familyName(getName(la[0])))!==phonetic(familyName(getName(lb[0])))) continue;
+          // เดิมบังคับนามสกุลเหมือนกันเป๊ะ ทำให้เคสที่ครูพิมพ์ *นามสกุล* ผิดไม่เคยถูกเสนอเลย
+          // (ธิวาธร ถานิช/ถานิชย์ · วรัขยา โมยา/โมหา) — ผ่อนเป็นต่างได้ไม่เกิน 2 ตัว
+          // พี่น้องยังกันอยู่ด้วยด่านชั้นเรียนข้างบน + ด่านชื่อตัวข้างล่าง ซึ่งไม่ได้แตะ
+          if(lev(phonetic(familyName(getName(la[0]))), phonetic(familyName(getName(lb[0]))))>2) continue;
           // ชื่อตัวต้องใกล้กันด้วย ไม่ใช่ต่างกันคนละชื่อ (กันเคสพี่น้อง ธนภัทร/ศศิธร กุระจินดา)
           if(lev(phonetic(firstName(getName(la[0]))), phonetic(firstName(getName(lb[0]))))>2) continue;
         }
@@ -550,13 +582,53 @@
   }
 
   /* ---------- รวมผลการตรวจ ---------- */
+  // ---- ชื่อที่ต่างกันเฉพาะตัวอักษรที่มองไม่เห็น ----
+  // เคสจริง 12 ส.ค. 69: ครูคนหนึ่งเคาะเว้นวรรคระหว่างชื่อกับนามสกุล 2 ที
+  // "ธนธรณ์ มณีเลิศ" กับ "ธนธรณ์  มณีเลิศ" — บนหน้าจอเหมือนกันเป๊ะ แต่ในชีตเป็นคนละค่า จึงถูกนับเป็น 2 คน
+  // 🚨 ทำไมตัวจับตัวอื่นมองไม่เห็น: detectNames เทียบด้วย rawName()/phonetic() ซึ่ง "ยุบช่องว่างซ้ำ" ทิ้งไปก่อนแล้ว
+  //    พอเทียบกันจึงเหมือนกันเป๊ะ ไม่มีคู่ให้เสนอ = เงียบหายไปเลย ต้องมีตัวนี้มาอุด
+  // (ห้องไม่ต้องทำซ้ำ — detectRooms จับด้วยค่าห้องดิบอยู่แล้ว เว้นวรรคเกินในห้องจึงขึ้นเองอยู่ก่อนหน้านี้)
+  function detectInvisible(rows){
+    var items=[];
+    var g=groupBy(rows, function(r){ return visKey(sName(r)); });
+    g.order.forEach(function(k){
+      var list=g.map[k];
+      // เทียบค่าดิบ (trim หัวท้ายอย่างเดียว) — ต้องไม่ยุบช่องว่างข้างใน ไม่งั้นจะมองไม่เห็นสิ่งที่ตามหาอยู่
+      var byText=groupBy(list, function(r){ return String(sName(r)==null?'':sName(r)).trim(); });
+      if(byText.order.length<2) return;
+      var opts=byText.order.map(function(txt){
+        var l=byText.map[txt];
+        return { value:txt, tickets:countTickets(l), rows:l.length, teachers:teacherList(l),
+                 clean:(visKey(txt)===txt), oddNote:describeOdd(txt) };
+      }).sort(function(a,b){
+        if(a.clean!==b.clean) return a.clean?-1:1;   // ค่าที่สะอาดอยู่แล้วต้องถูกเสนอเป็นค่าที่ถูกเสมอ
+        return sortOptions(a,b);
+      });
+      // members ต้องเป็นค่าที่ apply() เอาไปเทียบได้ — apply ใช้ rawName() จึงต้องแปลงให้ตรงกัน
+      var mem=[], seen={};
+      byText.order.forEach(function(txt){ var m=rawName(txt); if(!seen[m]){ seen[m]=1; mem.push(m); } });
+      items.push({
+        id:'invis:name:'+k,
+        type:'name',
+        level:'high',
+        reason:'ชื่อเดียวกัน แต่ในชีตเก็บไม่ตรงกัน ต่างที่ตัวอักษรที่มองไม่เห็น (เช่น เคาะเว้นวรรคเกิน) จึงถูกนับเป็นคนละคน',
+        title:opts[0].value,
+        cls:cls(byText.map[byText.order[0]][0]),
+        options:opts,
+        members:mem
+      });
+    });
+    return items;
+  }
+
   function detect(rows){
     if(!COL) return { items:[], tickets:[], counts:{} };
     var items=[]
       .concat(detectNames(rows,'student'))
       .concat(detectNames(rows,'teacher'))
       .concat(detectRooms(rows))
-      .concat(detectSubjects(rows));
+      .concat(detectSubjects(rows))
+      .concat(detectInvisible(rows));
 
     // ตัดรายการซ้ำ (คีย์เดียวกันอาจถูกจับได้จาก 2 ทาง)
     var seen={}, uniq=[];
@@ -647,12 +719,31 @@
   var LABEL={ name:'ชื่อนักเรียน', teacher:'ชื่อครู', room:'ห้องเรียน', subject:'รายวิชา' };
   var BADGE={ name:'ชื่อเขียนต่างกัน', teacher:'ชื่อครูซ้ำ', room:'ห้องไม่ตรงกัน', subject:'รหัสวิชาน่าจะผิด' };
 
+  // อธิบายเป็น "คำ" ว่าค่านี้แปลกตรงไหน
+  // 🚨 การไฮไลต์ตัวอักษรใช้กับสิ่งที่มองไม่เห็นไม่ได้ — ไฮไลต์ช่องว่างไปก็ยังไม่เห็นอยู่ดี
+  //    การ์ดนี้ให้คนเลือกว่าค่าไหนถูก ถ้าสองค่าดูเหมือนกันเป๊ะแล้วไม่เขียนบอกว่าต่างตรงไหน คนก็กดมั่ว
+  function describeOdd(s){
+    var t=String(s==null?'':s), n=[];
+    var run=t.match(/ {2,}/g);
+    if(run){
+      var most=0; run.forEach(function(x){ if(x.length>most) most=x.length; });
+      n.push('เคาะเว้นวรรค '+most+' ที ติดกัน');
+    }
+    var hid=(t.match(/[\u200B-\u200D\uFEFF\u2060\u00AD]/g)||[]).length;
+    if(hid) n.push('มีอักขระที่มองไม่เห็นปนอยู่ '+hid+' ตัว');
+    var odd=(t.match(/[\u00A0\u2000-\u200A\u202F\u3000]/g)||[]).length;
+    if(odd) n.push('มีช่องว่างชนิดพิเศษ '+odd+' ตัว');
+    if(t!==t.trim()) n.push('มีช่องว่างติดหัวหรือท้ายชื่อ');
+    if(thaiOrder(t)!==t) n.push('ลำดับสระกับวรรณยุกต์สลับกัน');
+    return n.length? n.join(' · ') : 'เขียนถูกต้อง ไม่มีอักขระแปลกปน';
+  }
   function optLabel(o){ return (o.value && typeof o.value==='object')?o.label:o.value; }
   function optNote(o){
     // ห้ามใช้คำว่า "ใบ" — เป็นศัพท์ในหัวคนทำระบบ ครูที่มาเจอครั้งแรกไม่รู้ว่าหมายถึงอะไร
     var n=[];
     if(o.teachers && o.teachers.length) n.push('ครู '+o.teachers.length+' คนกรอกแบบนี้');
     else n.push('พบ '+o.tickets+' ครั้ง');
+    if(o.oddNote) n.push(o.oddNote);   // เคสอักขระมองไม่เห็น ต้องเขียนบอกเป็นคำ ไฮไลต์อย่างเดียวไม่พอ
     if(o.stuck) n.push('มีคำนำหน้าติดมาในชื่อ');
     if(o.badFormat) n.push('รหัสผิดรูปแบบ');
     return n.join(' · ');
@@ -1220,6 +1311,7 @@
 
   var FIXESAPI=window.FIXES={
     setCol:function(c){ COL=c; ensureLoaded(); },
+    visKey:visKey,   // report.js ใช้ตัวเดียวกันนี้ จะได้ไม่มีวันเทียบกันคนละกติกา
     // ต่อกับหลังบ้าน — เรียกทันทีที่ล็อกอินผ่าน ก่อน normalizeRows รอบแรก
     // fixes ที่แนบมากับ doGet เป็นตัวบอกด้วยว่า Apps Script ที่ deploy ไว้รองรับแล้วหรือยัง
     // (เวอร์ชันเก่าคืนมาแต่ rows ไม่มีช่อง fixes เลย)

@@ -287,23 +287,37 @@
     return sel.value;
   }
 
+  // ล้างข้อความก่อนส่งขึ้นชีต — แก้ที่ต้นทาง ดีกว่าตามเช็ดทีหลังในหน้ารายงาน
+  // 🚨 เคสจริง 12 ส.ค. 69: ครูเคาะเว้นวรรคระหว่างชื่อกับนามสกุล 2 ที
+  //    "ธนธรณ์ มณีเลิศ" กับ "ธนธรณ์  มณีเลิศ" หน้าจอเหมือนกันเป๊ะ แต่ชีตเก็บคนละค่า
+  //    เด็กคนเดียวจึงถูกนับเป็น 2 คน ทั้งในการ์ด กราฟ ตาราง และเอกสารที่ปริ้น
+  //    อีกทางคือครูก๊อปชื่อจากไฟล์อื่นมาวาง แล้วติดอักขระที่มองไม่เห็นมาด้วย
+  // ⚠ ล้างเฉพาะสิ่งที่ "ลบแล้วหน้าตาไม่เปลี่ยน" เท่านั้น ห้ามไปแก้ตัวสะกดของครูเด็ดขาด
+  function cleanText(v){
+    var t=String(v==null?'':v);
+    if(t.normalize) t=t.normalize('NFC');
+    return t.replace(/[\u200B-\u200D\uFEFF\u2060\u00AD]/g,'')      // อักขระที่ไม่แสดงผลเลย — ลบทิ้ง
+            .replace(/[\u00A0\u2000-\u200A\u202F\u3000]/g,' ')   // ช่องว่างพันธุ์แปลก — ทำให้เป็นช่องว่างธรรมดา
+            .replace(/\s+/g,' ')                                    // เว้นวรรคซ้ำ — ยุบเหลือตัวเดียว
+            .trim();
+  }
   function collectData() {
     var students = [];
     studentBody.querySelectorAll('tr').forEach(function(tr,i){
-      var g = function(f){ var e=tr.querySelector('[data-field="'+f+'"]'); return e?e.value.trim():''; };
+      var g = function(f){ var e=tr.querySelector('[data-field="'+f+'"]'); return e?cleanText(e.value):''; };
       var seat=g('seat'); if(seat==='–') seat='';
       students.push({ order:i+1, seat:seat, prefix:g('prefix'), name:g('name'), classroom:buildCls(g('level'),g('room')),
         periods:g('periods'), present:g('present'), absent:g('absent'), percent:g('percent'), remark:getRemark(tr) });
     });
-    var fn=document.getElementById('teacherFirstName').value.trim();
-    var ln=document.getElementById('teacherLastName').value.trim();
+    var fn=cleanText(document.getElementById('teacherFirstName').value);
+    var ln=cleanText(document.getElementById('teacherLastName').value);
     return {
       dateInput:beToCE(document.getElementById('dateInput').value),
       teacherPrefix:document.getElementById('teacherPrefix').value,
       teacherFirstName:fn, teacherLastName:ln, teacherName:(fn+' '+ln).trim(),
       subjectGroup:document.getElementById('subjectGroup').value,
-      subjectCode:document.getElementById('subjectCode').value.trim(),
-      subjectName:document.getElementById('subjectName').value.trim(),
+      subjectCode:cleanText(document.getElementById('subjectCode').value),
+      subjectName:cleanText(document.getElementById('subjectName').value),
       credits:document.getElementById('credits').value.trim(),
       hoursPerWeek:document.getElementById('hoursPerWeek').value,
       semester:document.getElementById('semester').value,

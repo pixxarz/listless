@@ -178,12 +178,70 @@
     render(); updateFixCount();
   }
 
+  // ====== จำข้อมูลรอบล่าสุดไว้ในเครื่อง เพื่อให้เข้าครั้งต่อไปไม่ต้องนั่งรอ ======
+  // หลังบ้าน (Apps Script) ใช้เวลา 10-29 วินาทีต่อครั้ง และเราแก้ที่หลังบ้านไม่ได้
+  // ทางเดียวที่ทำได้ฝั่งเว็บคือ เอาของรอบที่แล้วขึ้นจอทันที แล้วค่อยสลับเป็นของจริงเมื่อมาถึง
+  // 🚨 กันคนอื่นเห็นข้อมูล: เก็บ "ลายนิ้วมือ" ของรหัสผ่าน (SHA-256) ไว้คู่กัน
+  //    รหัสที่กรอกต้องให้ลายนิ้วมือตรงกันเท่านั้นถึงจะเอาของที่จำไว้ขึ้นจอ
+  //    ถ้าเบราว์เซอร์ไม่มีตัวทำลายนิ้วมือ (crypto.subtle) = ไม่จำเลย ปลอดภัยไว้ก่อน
+  var CACHE_KEY='chanu_report_cache_v1';
+  var CACHE_MAX=4000000;        // ~4MB — ใหญ่กว่านี้ไม่เก็บ กัน localStorage เต็มแล้วพังทั้งเว็บ
+  var CACHE_TTL=12*3600*1000;   // เก็บได้ 12 ชั่วโมง แล้วลบทิ้งเอง — ข้อมูลนักเรียนไม่ควรค้างในเครื่องข้ามวัน
+  var cacheShown=false;
+
+  function passFingerprint(t){
+    try{
+      if(!(window.crypto && crypto.subtle && crypto.subtle.digest && window.TextEncoder)) return Promise.resolve('');
+      return crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)).then(function(h){
+        return [].map.call(new Uint8Array(h), function(x){ return ('0'+x.toString(16)).slice(-2); }).join('');
+      }).catch(function(){ return ''; });
+    }catch(e){ return Promise.resolve(''); }
+  }
+  function saveCache(pass, data){
+    passFingerprint(pass).then(function(h){
+      if(!h) return;
+      try{
+        var s=JSON.stringify({ h:h, at:new Date().toISOString(), rows:data.rows||[], fixes:data.fixes||[] });
+        if(s.length>CACHE_MAX) return;
+        localStorage.setItem(CACHE_KEY, s);
+      }catch(e){}   // โหมดส่วนตัว หรือพื้นที่เต็ม — ไม่จำก็ได้ ไม่ใช่เรื่องคอขาดบาดตาย
+    });
+  }
+  function loadCache(pass, cb){
+    passFingerprint(pass).then(function(h){
+      if(!h) return cb(null);
+      var raw=null, o=null;
+      try{ raw=localStorage.getItem(CACHE_KEY); }catch(e){ return cb(null); }
+      if(!raw) return cb(null);
+      try{ o=JSON.parse(raw); }catch(e){ return cb(null); }
+      if(!o || o.h!==h) return cb(null);   // ลายนิ้วมือไม่ตรง = รหัสคนละตัว ห้ามให้เห็นเด็ดขาด
+      // เก่าเกินกำหนดก็ทิ้ง — ข้อมูลนักเรียนไม่ควรค้างในเครื่องนานเกินจำเป็น
+      var age=Date.now()-(new Date(o.at).getTime()||0);
+      if(!(age>=0) || age>CACHE_TTL){ clearCache(); return cb(null); }
+      cb(o);
+    });
+  }
+  function clearCache(){ try{ localStorage.removeItem(CACHE_KEY); }catch(e){} }
+
+  // แถบบอกสถานะว่ากำลังดูของเก่าอยู่ — ต้องมี ไม่งั้นคนเข้าใจผิดว่านี่คือข้อมูลล่าสุด
+  function staleBar(msg, at, warn){
+    var b=document.getElementById('staleBar');
+    if(!b){
+      b=document.createElement('div'); b.id='staleBar'; b.className='stale-bar';
+      var d=document.getElementById('dash'); d.insertBefore(b, d.firstChild);
+    }
+    if(!msg){ b.remove(); return; }
+    b.className='stale-bar'+(warn?' warn':'');
+    b.innerHTML='<span class="stale-dot"></span>'+esc(msg)+(at?' <span class="stale-at">ข้อมูลเมื่อ '+esc(fmtDate(at))+' '+esc(fmtTime(at))+'</span>':'');
+  }
   // ====== Password gate ======
   var gate=document.getElementById('gate'), main=document.getElementById('main');
   function tryLogin(pass, onFail, onTry){
     jsonp({ key:pass }, function(data){
       if(data && data.result==='OK'){
-        currentPass=pass;   // เก็บใน memory (หายเมื่อปิด/รีเฟรชหน้า) เพื่อใช้เช็ครายงานใหม่อัตโนมัติ
+        currentPass=pass;
+        saveCache(pass, data);        // จำไว้ให้ครั้งหน้าเข้าได้ทันที
+        staleBar('');                 // ของจริงมาแล้ว เอาแถบ "กำลังโหลด" ออก   // เก็บใน memory (หายเมื่อปิด/รีเฟรชหน้า) เพื่อใช้เช็ครายงานใหม่อัตโนมัติ
         // ต่อระบบตรวจสอบข้อมูลเข้ากับหลังบ้านก่อน normalizeRows รอบแรก — ไม่งั้นรอบแรกจะทับข้อมูลด้วยผลการตรวจเปล่าๆ
         if(window.FIXES) window.FIXES.connect({ url:SHEET_URL, key:pass, fixes:data.fixes, onRows:adoptRows });
         seenFixes=JSON.stringify(data.fixes||[]);
@@ -191,6 +249,9 @@
         gate.classList.add('hidden'); main.classList.remove('hidden');
         initApp();
       } else if(data && data.error==='unauthorized'){
+        // รหัสผิด = ของที่จำไว้ใช้ไม่ได้แล้ว ล้างทิ้งและถอยกลับไปหน้ากรอกรหัส
+        clearCache();
+        if(cacheShown){ cacheShown=false; main.classList.add('hidden'); gate.classList.remove('hidden'); }
         onFail('รหัสผ่านไม่ถูกต้อง');
       } else {
         onFail(netErrorText(data));
@@ -209,10 +270,23 @@
     this.disabled=true;
     var btn=this;
     btn.textContent='กำลังเชื่อมต่อ...';   // เปลี่ยนข้อความบนปุ่มด้วย ไม่ใช่แค่กดไม่ได้เฉยๆ
+    // เอาของที่จำไว้ขึ้นจอทันที ไม่ต้องรอหลังบ้าน — คำขอจริงยังวิ่งอยู่ข้างหลัง พอมาถึงจะสลับให้เอง
+    loadCache(p, function(c){
+      if(!c || cacheShown || currentPass) return;   // ของจริงมาทันแล้ว ไม่ต้องเอาของเก่ามาทับ
+      cacheShown=true;
+      if(window.FIXES) window.FIXES.setCol(COL);
+      allRows=normalizeRows(c.rows||[], c.fixes||[]);
+      gate.classList.add('hidden'); main.classList.remove('hidden');
+      initApp();
+      staleBar('กำลังโหลดข้อมูลล่าสุด...', c.at);
+    });
     tryLogin(p,
       // ล้มแล้วเปลี่ยนปุ่มเป็น "ลองใหม่อีกครั้ง" ให้ชัดว่าต้องกดอะไรต่อ
       // ของเดิมปุ่มกลับไปเขียนว่า "เข้าสู่ระบบ" เหมือนเดิม คนจึงไม่รู้ว่ากดซ้ำได้
       function(msg){
+        // ถ้ากำลังโชว์ของที่จำไว้อยู่ ห้ามเด้งกลับไปหน้ารหัสผ่าน — ให้ดูของเก่าต่อไปดีกว่าไม่ได้ดูอะไรเลย
+        // (ตอนหลังบ้านล่ม อันนี้คือสิ่งเดียวที่ยังใช้งานได้)
+        if(cacheShown){ staleBar('เชื่อมต่อไม่สำเร็จ กำลังแสดงข้อมูลที่บันทึกไว้', null, true); return; }
         err.textContent=msg; err.className='err';
         btn.disabled=false;
         btn.textContent=(msg.indexOf('รหัสผ่าน')>=0) ? GATE_LABEL : 'ลองใหม่อีกครั้ง';
@@ -220,6 +294,7 @@
       // บอกให้รู้ว่าระบบยังพยายามอยู่ ไม่ได้ค้าง — เน็ตสะดุดครั้งแรกเป็นเรื่องปกติของบางเบราว์เซอร์
       function(n, max){
         if(n>1){
+          if(cacheShown){ staleBar('กำลังโหลดข้อมูลล่าสุด (ลองครั้งที่ '+n+' จาก '+max+')', null); return; }
           err.textContent='เครือข่ายสะดุด กำลังลองใหม่ ครั้งที่ '+n+' จาก '+max+'...';
           btn.textContent='กำลังลองใหม่ ('+n+'/'+max+')';
         }
@@ -234,7 +309,10 @@
     inp.focus();
   });
   document.getElementById('outBtn').addEventListener('click', function(){
-    location.reload(); // กลับไปหน้ารหัสผ่าน (ระบบไม่ได้เก็บรหัสไว้ จึงไม่ต้องล้างอะไร)
+    // "ออกจากระบบ" ต้องล้างข้อมูลที่จำไว้ในเครื่องด้วย ไม่งั้นคนถัดไปที่รู้รหัสยังเห็นของเก่าได้ทันที
+    // นี่คือวิธีเดียวที่ผู้ใช้สั่งลบข้อมูลออกจากเครื่องได้เอง — ปิดเบราว์เซอร์เฉย ๆ ไม่ลบให้
+    clearCache();
+    location.reload(); // กลับไปหน้ารหัสผ่าน (ระบบไม่ได้เก็บรหัสไว้)
   });
 
   // ไม่จำรหัส — เปิดหน้านี้ต้องกรอกรหัสผ่านใหม่ทุกครั้ง (ปลอดภัยสุด)
@@ -243,10 +321,37 @@
   function uniq(arr){ var s={},o=[]; arr.forEach(function(v){ if(v!=='' && v!=null && !s[v]){ s[v]=1; o.push(v); } }); return o; }
   function parseClass(c){ c=String(c||'').trim(); var t=c.replace('ม.',''); var p=t.split('/'); return { level:(p[0]||'').trim(), room:(p[1]||'').trim() }; }
   function num(v){ var n=parseFloat(v); return isNaN(n)?null:n; }
+  // ระบุตัวนักเรียนจากชื่อ-สกุลล้วน (ไม่เอาคำนำหน้ามาทำให้แยก) + ยุบช่องว่าง
+  // 🚨 ทุกที่ที่นับ "คน" ต้องใช้ตัวนี้ตัวเดียว ไม่งั้นการ์ดกับกราฟจะได้เลขไม่ตรงกัน (เคยพลาดมาแล้ว)
+  // ต้องผ่าน visKey ด้วย ไม่งั้นชื่อที่ต่างกันแค่อักขระมองไม่เห็นจะถูกนับเป็นสองคนในการ์ด/กราฟ
+  // ทั้งที่ป๊อปอัปยุบให้เป็นแถวเดียวไปแล้ว — เลขจะขัดกันเองอีกรอบ
+  function stuKey(r){ return visKey(r[COL.sName]); }
+  // นับคนไม่ซ้ำจากชุดแถว
+  function countStu(rows){ return uniq(rows.map(stuKey)).length; }
+  // ค่าที่ "ตาเห็นเหมือนกัน" — ตัวจริงอยู่ใน js/fixes.js (โหลดก่อนไฟล์นี้เสมอ ดู report.html)
+  // 🚨 ห้ามเขียนสำเนาไว้ที่นี่ ถ้าสองไฟล์ล้างอักขระคนละชุด การ์ด/กราฟ กับ ป๊อปอัป/ตัวตรวจ จะนับคนไม่ตรงกันทันที
+  function visKey(v){
+    if(window.FIXES && FIXES.visKey) return FIXES.visKey(v);
+    return String(v==null?'':v).replace(/\s+/g,' ').trim();   // fixes.js หาย = ทำได้แค่ยุบช่องว่าง
+  }
 
+  // แสดงค่าที่ครูกรอกไม่ตรงกันให้เห็นครบ — แต่ถ้าทุกค่า "ตาเห็นเหมือนกัน" ห้ามเอามาต่อกัน
+  // 🚨 ไม่งั้นจะได้ "ธนธรณ์ มณีเลิศ / ธนธรณ์ มณีเลิศ" ซึ่งคนอ่านจะนึกว่าเว็บพัง
+  //    เคสนั้นต่างกันที่อักขระมองไม่เห็น อธิบายในป้ายชี้เมาส์พอ ไม่ต้องเอามาโชว์บนหน้าจอ
+  function dispVar(list, one, sep){
+    if(!list || list.length<2) return one;
+    var v0=visKey(list[0]);
+    if(list.every(function(v){ return visKey(v)===v0; })) return one;   // ตาเห็นเหมือนกันหมด → โชว์ค่าเดียว
+    return list.join(sep||', ');
+  }
+
+  var appReady=false;
   function initApp(){
     document.getElementById('loading').classList.add('hidden');
     document.getElementById('dash').classList.remove('hidden');
+    // เข้ารอบสอง (ของจริงมาแทนที่ของที่จำไว้) — วาดใหม่พอ ห้ามผูกปุ่มซ้ำ ไม่งั้นกดทีเดียวทำงานสองรอบ
+    if(appReady){ buildFilterOptions(); render(); updateFixCount(); return; }
+    appReady=true;
     buildFilterOptions();
     document.getElementById('fSearch').addEventListener('input', debounce(render, 200)); // ช่องค้นหา = หน่วง 0.2 วิ หลังหยุดพิมพ์ค่อยสร้างตาราง
     ['fRoom','fPrefix','fTeacher','fSubject','fTerm','fRemark','fFrom','fTo'].forEach(function(id){
@@ -427,14 +532,13 @@
   })();
 
   function renderKPI(rows){
-    var sKey=function(r){ return String(r[COL.sName]||'').replace(/\s+/g,' ').trim(); }; // ระบุตัวนักเรียนจากชื่อ-สกุลล้วน (ไม่เอาคำนำหน้ามาทำให้แยก) + ยุบช่องว่าง
-    var students=uniq(rows.map(sKey)).length;                                    // นับนักเรียนไม่ซ้ำ
+    var students=countStu(rows);                                                 // นับนักเรียนไม่ซ้ำ
     var reports=uniq(rows.map(function(r){ return r[COL.ts]; })).length;
     var teachers=uniq(rows.map(function(r){ return ((r[COL.tPrefix]||'')+r[COL.tName]).replace(/\s+/g,' ').trim(); })).length;
     var subjects=uniq(rows.map(function(r){ return String(r[COL.code]||r[COL.subject]||'').replace(/\s+/g,'').trim(); })).length; // นับจากรหัสวิชา + ยุบช่องว่าง
     var pcts=rows.map(function(r){ return num(r[COL.percent]); }).filter(function(v){ return v!=null; });
     var avg=pcts.length? (pcts.reduce(function(a,b){return a+b;},0)/pcts.length) : null;
-    var longAbsent=uniq(rows.filter(function(r){ return r[COL.remark]==='ขาดเรียนนาน'; }).map(sKey)).length; // ขาดเรียนนาน ไม่ซ้ำ
+    var longAbsent=countStu(rows.filter(function(r){ return r[COL.remark]==='ขาดเรียนนาน'; })); // ขาดเรียนนาน ไม่ซ้ำ
     var cards=[
       {label:'รายชื่อนักเรียนทั้งหมด', value:students, unit:'คน', cls:'', type:'students', action:'modal'},
       {label:'จำนวนใบรายงาน', value:reports, unit:'ใบ', cls:'blue', type:'reports', action:'modal'},
@@ -464,29 +568,48 @@
     if(tc) tc.scrollIntoView({ behavior:'smooth', block:'start' });
   }
 
+  // กราฟแท่ง: จำนวนนักเรียน (ไม่ซ้ำ) แยกตามระดับชั้น
+  // 🚨 แท่งนับ "คน" ไม่ใช่จำนวนแถว — เด็ก 1 คนที่ถูกรายงาน 5 วิชา ต้องนับ 1 ไม่ใช่ 5
+  //    ยอดรวมของแท่งจึงต้องเท่ากับการ์ด "รายชื่อนักเรียนทั้งหมด" (ถ้าไม่เท่า = มีชื่อซ้ำข้ามชั้น ดูหมายเหตุท้ายกราฟ)
   function renderChart(rows){
-    var counts={}; for(var i=1;i<=6;i++) counts[i]=0;
-    var other=0;
-    rows.forEach(function(r){ var lv=parseClass(r[COL.cls]).level; if(lv && counts[lv]!=null) counts[lv]++; else if(lv) counts[lv]=(counts[lv]||0)+1; else other++; });
-    if(other>0) counts['อื่นๆ']=other; // แถวที่ชั้น/ห้องว่างหรือแยกชั้นไม่ได้ — นับรวมไว้ให้ยอดกราฟตรงกับตาราง
-    var max=1; Object.keys(counts).forEach(function(k){ if(counts[k]>max) max=counts[k]; });
-    var html='';
-    Object.keys(counts).sort(function(a,b){ if(a==='อื่นๆ')return 1; if(b==='อื่นๆ')return -1; return (+a)-(+b); }).forEach(function(k){
-      var w=Math.round(counts[k]/max*100);
-      var label=(k==='อื่นๆ')?'อื่นๆ':'ม.'+k;
-      html+='<div class="bar-row" data-tip="'+esc(label)+' : '+counts[k]+' คน"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+counts[k]+'</div></div>';
+    var buckets={}; for(var i=1;i<=6;i++) buckets[i]=[];
+    rows.forEach(function(r){
+      var lv=parseClass(r[COL.cls]).level;
+      var k=lv||'อื่นๆ';                        // ชั้น/ห้องว่างหรือแยกชั้นไม่ได้ — เก็บไว้ ไม่ให้ตกหล่นจากกราฟ
+      if(!buckets[k]) buckets[k]=[];
+      buckets[k].push(r);
     });
+    var keys=Object.keys(buckets).sort(function(a,b){ if(a==='อื่นๆ')return 1; if(b==='อื่นๆ')return -1; return (+a)-(+b); });
+    var stu={}, rec={}, max=1, sumStu=0;
+    keys.forEach(function(k){
+      stu[k]=countStu(buckets[k]); rec[k]=buckets[k].length; sumStu+=stu[k];
+      if(stu[k]>max) max=stu[k];
+    });
+    var html='';
+    keys.forEach(function(k){
+      var w=Math.round(stu[k]/max*100);
+      var label=(k==='อื่นๆ')?'อื่นๆ':'ม.'+k;
+      html+='<div class="bar-row" data-tip="'+esc(label)+' : '+stu[k]+' คน ('+rec[k]+' รายการ)"><div class="lbl">'+label+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+stu[k]+'</div></div>';
+    });
+    // ชื่อเดียวกันโผล่สองระดับชั้น จะถูกนับสองแท่ง ยอดรวมเลยเกินการ์ด — บอกตรง ๆ ดีกว่าปล่อยให้เลขขัดกันเงียบ ๆ
+    if(html){
+      var total=countStu(rows), over=sumStu-total;
+      if(over>0) html+='<div class="chart-note">⚠ รวมทุกแท่งได้ '+sumStu+' คน มากกว่ายอดจริง '+total+' คน เพราะมี '+over+' ชื่อที่โผล่มากกว่า 1 ระดับชั้น (อาจเป็นคนเดียวกันที่ครูกรอกผิดชั้น หรือคนละคนที่ชื่อเหมือนกัน) <span class="chart-note-go" onclick="document.getElementById(\'fixBtn\').click()">ตรวจสอบข้อมูล</span></div>';
+    }
     document.getElementById('gradeChart').innerHTML=html||'<div class="empty-hint">ไม่มีข้อมูล</div>';
   }
 
   // กราฟแท่ง: จำนวนนักเรียนขาดเรียน แยกตามรายวิชา (โชว์ 7 อันแรก + ปุ่มดูทั้งหมด)
+  // แท่งนับ "คน" ไม่ซ้ำเช่นกัน — ครูคนละคนรายงานเด็กคนเดิมในวิชาเดียวกันได้ ต้องไม่นับซ้ำ
   function renderSubjectChart(rows){
-    var counts={};
-    rows.forEach(function(r){ var name=r[COL.subject]||'(ไม่ระบุวิชา)'; var key=name+(r[COL.code]?' ('+r[COL.code]+')':''); counts[key]=(counts[key]||0)+1; });
+    var buckets={};
+    rows.forEach(function(r){ var name=r[COL.subject]||'(ไม่ระบุวิชา)'; var key=name+(r[COL.code]?' ('+r[COL.code]+')':''); (buckets[key]=buckets[key]||[]).push(r); });
+    var counts={}, recs={};
+    Object.keys(buckets).forEach(function(k){ counts[k]=countStu(buckets[k]); recs[k]=buckets[k].length; });
     var keys=Object.keys(counts).sort(function(a,b){ return counts[b]-counts[a]; });
     var max=1; keys.forEach(function(k){ if(counts[k]>max) max=counts[k]; });
     var html='';
-    keys.slice(0,7).forEach(function(k){ var w=Math.round(counts[k]/max*100); html+='<div class="bar-row" data-tip="'+esc(k)+' : '+counts[k]+' คน"><div class="lbl subj-lbl" title="'+esc(k)+'">'+esc(k)+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+counts[k]+'</div></div>'; });
+    keys.slice(0,7).forEach(function(k){ var w=Math.round(counts[k]/max*100); html+='<div class="bar-row" data-tip="'+esc(k)+' : '+counts[k]+' คน ('+recs[k]+' รายการ)"><div class="lbl subj-lbl" title="'+esc(k)+'">'+esc(k)+'</div><div class="track"><div class="fill" style="width:'+w+'%"></div></div><div class="num">'+counts[k]+'</div></div>'; });
     if(!keys.length) html='<div class="empty-hint">ไม่มีข้อมูล</div>';
     else if(keys.length>7) html+='<div class="chart-more" onclick="openCardModal(\'subjects\')">ดูทั้งหมด ('+keys.length+' วิชา) →</div>';
     document.getElementById('subjectChart').innerHTML=html;
@@ -501,14 +624,18 @@
       {label:'50–70%', test:function(p){return p>=50&&p<70;}, color:'#eab308'}
     ];
     /* ไม่มีช่วง "70% ขึ้นไป" — เพราะระบบกันบันทึกนักเรียนที่เข้าเรียนถึง/เกิน 70% อยู่แล้ว */
-    var counts=bins.map(function(){return 0;});
-    rows.forEach(function(r){ var p=num(r[COL.percent]); if(p==null) return; for(var i=0;i<bins.length;i++){ if(bins[i].test(p)){ counts[i]++; break; } } });
-    var max=1; counts.forEach(function(c){ if(c>max) max=c; });
+    var buckets=bins.map(function(){return [];});
+    rows.forEach(function(r){ var p=num(r[COL.percent]); if(p==null) return; for(var i=0;i<bins.length;i++){ if(bins[i].test(p)){ buckets[i].push(r); break; } } });
+    var counts=buckets.map(countStu), recs=buckets.map(function(b){ return b.length; });
+    var max=1, sumStu=0; counts.forEach(function(c){ sumStu+=c; if(c>max) max=c; });
     var html='';
     bins.forEach(function(b,i){
       var w=Math.round(counts[i]/max*100);
-      html+='<div class="bar-row" data-tip="'+b.label+' : '+counts[i]+' คน"><div class="lbl" style="width:96px">'+b.label+'</div><div class="track"><div class="fill" style="width:'+w+'%;background:'+b.color+'"></div></div><div class="num">'+counts[i]+'</div></div>';
+      html+='<div class="bar-row" data-tip="'+b.label+' : '+counts[i]+' คน ('+recs[i]+' รายการ)"><div class="lbl" style="width:96px">'+b.label+'</div><div class="track"><div class="fill" style="width:'+w+'%;background:'+b.color+'"></div></div><div class="num">'+counts[i]+'</div></div>';
     });
+    // ที่นี่การนับซ้ำเป็นเรื่องปกติ ไม่ใช่ข้อผิดพลาด — เด็ก 1 คนมี % คนละค่าในแต่ละวิชา จึงตกได้หลายช่วง
+    var total=countStu(rows.filter(function(r){ return num(r[COL.percent])!=null; }));
+    if(sumStu>total) html+='<div class="chart-note">นักเรียน 1 คนอยู่ได้หลายช่วง เพราะแต่ละวิชามี % ไม่เท่ากัน — รวมทุกแท่งจึงมากกว่ายอดจริง '+total+' คน</div>';
     document.getElementById('percentChart').innerHTML=html;
   }
 
@@ -523,7 +650,7 @@
       var r=x.r;
       return '<div class="risk-row"><span>'+esc((r[COL.sPrefix]||'')+r[COL.sName])+' <span style="color:#9ca3af">('+esc(r[COL.cls])+')</span></span><span class="pct">'+x.p.toFixed(1)+'%</span></div>';
     }).join('');
-    if(withPct.length>5) html+='<div class="chart-more" onclick="openCardModal(\'risk\')">ดูทั้งหมด ('+withPct.length+' คน) →</div>';
+    if(withPct.length>5) html+='<div class="chart-more" onclick="openCardModal(\'risk\')">ดูทั้งหมด ('+withPct.length+' รายการ) →</div>';
     document.getElementById('riskList').innerHTML=html;
   }
 
@@ -582,17 +709,28 @@
         return { label:label, teachers:uniq(s.recs.map(function(r){ return tName(r); })).join(', '), periods:(ok?String(tp):''), present:(ok?String(tm):''), absent:String(ta), pct:sp, remark:uniq(s.recs.map(function(r){ return sv(r[COL.remark]); }).filter(Boolean)).join(', ') };
       });
     };
+    // 🚨 กุญแจจัดกลุ่มต้องใช้ค่าที่ "ตาเห็น" (visKey) ไม่ใช่ค่าดิบ
+    //    ของเดิมเอา r[COL.cls] ดิบ ๆ มาต่อกุญแจ — 'ม.2/1' กับ 'ม.2/1 ' (ติดช่องว่างท้าย) จึงกลายเป็นคนละคน
+    //    ผลคือนักเรียนคนเดียวแตกเป็นสองแถวที่หน้าตาเหมือนกันเป๊ะทุกช่อง ไม่มีทางดูออกด้วยตา
     var grp={}, ord=[];
     records.forEach(function(r){
-      var nm=String(r[COL.sName]||'').replace(/\s+/g,' ').trim();   // ชื่อ-สกุลล้วน (ไม่รวมคำนำหน้า → เรียงตามชื่อจริง)
-      var k=nm+'|'+(r[COL.cls]||'');
-      if(!grp[k]){ grp[k]={name:nm, prefix:sv(r[COL.sPrefix]), cls:r[COL.cls]||'', seat:sv(r[COL.seat]), recs:[]}; ord.push(k); }
+      var nmRaw=String(r[COL.sName]||'').replace(/\s+/g,' ').trim();   // ชื่อ-สกุลล้วน (ไม่รวมคำนำหน้า → เรียงตามชื่อจริง)
+      var k=visKey(nmRaw)+'|'+visKey(r[COL.cls]);
+      if(!grp[k]){ grp[k]={name:nmRaw, prefix:sv(r[COL.sPrefix]), cls:sv(r[COL.cls]), seat:sv(r[COL.seat]), recs:[]}; ord.push(k); }
       grp[k].recs.push(r);
     });
+    // เก็บค่าที่ต่างกันไว้ให้เห็นครบ ไม่ให้ค่าของครูคนหลังหายเงียบตอนยุบแถว
+    var variants=function(recs, col){
+      var seen={}, out=[];
+      recs.forEach(function(r){ var v=sv(r[col]).trim(); if(!v) return; if(!seen[v]){ seen[v]=1; out.push(v); } });
+      return out;
+    };
     var groups=ord.map(function(k){
       var x=grp[k], subs=subjAgg(x.recs), op=overallPct(x.recs);
       var sub=subs.map(function(s){ return [s.label, s.teachers, s.periods, s.present, s.absent, s.pct, s.remark]; });
-      return { main:[ x.seat, x.name, x.cls, String(subs.length), (op==null?'–':op.toFixed(1)) ], prefix:x.prefix, opNum:op, sub:sub };
+      return { main:[ x.seat, x.name, x.cls, String(subs.length), (op==null?'–':op.toFixed(1)) ], prefix:x.prefix,
+        seats:variants(x.recs, COL.seat), prefixes:variants(x.recs, COL.sPrefix),
+        names:variants(x.recs, COL.sName), clsList:variants(x.recs, COL.cls), opNum:op, sub:sub };
     });
     var csvRows=[];
     ord.forEach(function(k){ var x=grp[k]; subjAgg(x.recs).forEach(function(s){ csvRows.push([ x.prefix, x.name, x.cls, s.label, s.teachers, s.periods, s.present, s.absent, s.pct, s.remark ]); }); });
@@ -629,7 +767,7 @@
     return ord.map(function(n){
       var x=t[n], repSet={}, stuSet={}, subSet={}, subOrd=[];
       x.recs.forEach(function(r){
-        repSet[String(r[COL.ts])]=1; stuSet[sName(r).replace(/\s+/g,' ').trim()]=1;
+        repSet[String(r[COL.ts])]=1; stuSet[stuKey(r)]=1;   // นับคนด้วยกติกาเดียวกับการ์ด/กราฟ (ชื่อล้วน ไม่เอาคำนำหน้า)
         var c=String(r[COL.code]||'').replace(/\s+/g,'').trim()||('n:'+(r[COL.subject]||'')); if(!subSet[c]){ subSet[c]=1; subOrd.push((r[COL.subject]||'(ไม่ระบุ)')+(r[COL.code]?' ('+r[COL.code]+')':'')); }
       });
       // % เฉลี่ยของครู = มาเรียนรวม / คาบรวม ของนักเรียนทุกคนที่ครูส่ง
@@ -657,7 +795,7 @@
     records.forEach(function(r){
       var key=String(r[COL.code]||'').replace(/\s+/g,'').trim()||('n:'+String(r[COL.subject]||'').replace(/\s+/g,' ').trim());
       if(!s[key]){ s[key]={name:r[COL.subject]||'(ไม่ระบุ)', code:r[COL.code]||'', recs:[], stuSet:{}, teaSet:{}, teaOrd:[]}; os.push(key); }
-      s[key].recs.push(r); s[key].stuSet[sName(r).replace(/\s+/g,' ').trim()]=1;
+      s[key].recs.push(r); s[key].stuSet[stuKey(r)]=1;   // นับคนด้วยกติกาเดียวกับการ์ด/กราฟ (ชื่อล้วน ไม่เอาคำนำหน้า)
       var tn=tName(r); if(!s[key].teaSet[tn]){ s[key].teaSet[tn]=1; s[key].teaOrd.push(tn); }
     });
     return os.map(function(key){
@@ -683,10 +821,11 @@
     {label:'% เฉลี่ย', key:'pct', type:'num', center:true, w:'9%', get:function(g){return g.avgNum;}}
   ];
   var STU_COLS=[
-    {label:'ชั้น/ห้อง', key:'cls', type:'str', center:true, w:'13%', get:function(g){return g.main[2];}, tie:function(g){return +g.main[0];}},
-    {label:'เลขที่', key:'seat', type:'num', center:true, w:'9%', get:function(g){return g.main[0];}},
-    {label:'คำนำหน้า', key:'prefix', type:'str', center:true, w:'11%', get:function(g){return g.prefix;}},
-    {label:'ชื่อ-สกุล', key:'name', type:'str', w:'27%', get:function(g){return g.main[1];}, alpha:true},
+    {label:'ชั้น/ห้อง', key:'cls', type:'str', center:true, w:'13%', get:function(g){return g.main[2];}, tie:function(g){return +g.main[0];}, disp:function(g){ return dispVar(g.clsList, g.main[2]); }},
+    // get = ค่าไว้เรียงลำดับ (ต้องเป็นค่าเดียว) · disp = ค่าไว้แสดง (โชว์ครบทุกค่าที่ครูกรอกไม่ตรงกัน)
+    {label:'เลขที่', key:'seat', type:'num', center:true, w:'9%', get:function(g){return g.main[0];}, disp:function(g){ return dispVar(g.seats, g.main[0]); }},
+    {label:'คำนำหน้า', key:'prefix', type:'str', center:true, w:'11%', get:function(g){return g.prefix;}, disp:function(g){ return dispVar(g.prefixes, g.prefix); }},
+    {label:'ชื่อ-สกุล', key:'name', type:'str', w:'27%', get:function(g){return g.main[1];}, alpha:true, disp:function(g){ return dispVar(g.names, g.main[1], ' / '); }},
     {label:'จำนวนวิชา', key:'count', type:'num', center:true, w:'18%', get:function(g){return +g.main[3];}},
     {label:'% เข้าเรียน (รวม)', key:'pct', type:'num', center:true, w:'22%', get:function(g){return g.opNum;}, disp:function(g){return g.main[4];}}
   ];
@@ -863,7 +1002,7 @@
         .filter(function(x){ return x.p!=null && x.p>0; });
       ra.sort(function(a,b){ return a.p-b.p; });
       var outR=ra.map(function(x){ return x.row; });
-      return { title:'นักเรียนกลุ่มเสี่ยง — % ต่ำ ยังไม่ระบุขาดเรียนนาน ('+outR.length+' คน)', headers:['ชื่อ-สกุล','ชั้น/ห้อง','วิชา','% เข้าเรียน'], data:outR };
+      return { title:'นักเรียนกลุ่มเสี่ยง — % ต่ำ ยังไม่ระบุขาดเรียนนาน ('+outR.length+' รายการ)', headers:['ชื่อ-สกุล','ชั้น/ห้อง','วิชา','% เข้าเรียน'], data:outR };
     }
     // avg + long → รายนักเรียน
     var src=rows;
@@ -1052,6 +1191,87 @@
   }
   function closeCardModal(){ document.getElementById('cardModal').classList.remove('show'); document.body.style.overflow=''; }
   // render ตารางรายชื่อนักเรียนในป๊อปอัป ตามตัวกรอง (ค้นหาชื่อ / ช่วง % รวม / รหัสวิชา)
+  // หาแถวที่ "ชื่อ-สกุลเหมือนกัน แต่บางส่วนต่างกัน" (ห้อง / เลขที่ / คำนำหน้า)
+  // 🚨 ตั้งใจไม่ยุบให้อัตโนมัติ เพราะแยกไม่ออกว่าเป็นคนเดียวกันที่ครูกรอกต่างกัน หรือคนละคนที่ชื่อพ้องกันจริง
+  //    ยุบไปแล้วมองไม่เห็นอีก แต่โชว์สองแถวยังไปยุบทีหลังได้ — หน้าที่ตรงนี้คือ "ชี้ให้เห็น" แล้วให้คนตัดสิน
+  //    เทียบค่าดิบ (trim อย่างเดียว ไม่ยุบช่องว่าง) เพื่อให้ 'ม.2/3' กับ 'ม. 2/3' ถูกจับว่าต่างด้วย
+  function findNameDups(groups){
+    var FIELDS=[
+      {key:'cls',    label:'ห้อง',      get:function(g){ return String(g.main[2]==null?'':g.main[2]).trim(); }},
+      {key:'seat',   label:'เลขที่',    get:function(g){ return String(g.main[0]==null?'':g.main[0]).trim(); }},
+      {key:'prefix', label:'คำนำหน้า',  get:function(g){ return String(g.prefix==null?'':g.prefix).trim(); }}
+    ];
+    // จับกลุ่มด้วยชื่อที่ "ตาเห็น" — ชื่อที่ต่างกันแค่อักขระมองไม่เห็นต้องมาอยู่กองเดียวกัน ไม่งั้นจับไม่ได้เลย
+    var byName={}, order=[];
+    groups.forEach(function(g,i){
+      var n=visKey(g.main[1]);
+      if(!byName[n]){ byName[n]=[]; order.push(n); }
+      byName[n].push(i);
+    });
+    // 🚨 กฎการแสดงผล ตั้งไว้ให้คนที่ไม่เคยใช้ระบบก็อ่านออกทันที ห้ามพึ่งการเอาเมาส์ไปชี้
+    //    - "ป้ายข้อความ" (chip) มีทุกแถวที่ผิดปกติ บอกเป็นภาษาไทยว่าผิดยังไง — คนอ่านไม่ต้องเดา
+    //    - "กรอบแดง" ตีเฉพาะช่องที่ตัวเลข/ตัวอักษรในช่องนั้น "แสดงสองค่าให้เห็นอยู่แล้ว" (เช่น 36, 37)
+    //      เคยตีกรอบช่องที่เนื้อในดูปกติทุกอย่าง (ต่างกันที่อักขระมองไม่เห็น) — คนอ่านงงว่าตีกรอบทำไม
+    var rows={}, flagged={};
+    function mark(i, name, opt){
+      if(!rows[i]) rows[i]={ diff:{}, chips:[], tips:[] };
+      Object.keys(opt.diff||{}).forEach(function(k){ rows[i].diff[k]=1; });
+      (opt.chips||[]).forEach(function(c){ if(rows[i].chips.indexOf(c)<0) rows[i].chips.push(c); });
+      if(opt.tip) rows[i].tips.push(opt.tip);
+      flagged[name]=1;
+    }
+    // (1) ชื่อเดียวกันแต่แยกเป็นหลายแถว — ต่างที่ห้อง (และอาจต่างเลขที่/คำนำหน้าด้วย)
+    order.forEach(function(n){
+      var idx=byName[n]; if(!n || idx.length<2) return;
+      var diff={}, labels=[];
+      FIELDS.forEach(function(f){
+        var seen={}, c=0;
+        idx.forEach(function(i){ var v=f.get(groups[i]); if(!seen[v]){ seen[v]=1; c++; } });
+        if(c>1){ diff[f.key]=1; labels.push(f.label); }
+      });
+      var chip, tip;
+      if(labels.length){
+        chip='ชื่อซ้ำ '+idx.length+' รายการ ต่างที่'+labels.join('/');
+        tip='ชื่อนี้มีอยู่ '+idx.length+' รายการในระบบ ต่างกันที่'+labels.join(' และ ')
+           +' — อาจเป็นคนเดียวกันที่ครูกรอกต่างกัน หรือคนละคนที่ชื่อเหมือนกัน';
+      }else{
+        // ทุกช่องเหมือนกันหมด = ต่างที่อักขระมองไม่เห็น → ห้ามตีกรอบ เพราะช่องไหนก็ดูปกติ
+        chip='ชื่อซ้ำ '+idx.length+' รายการ ตาเห็นเหมือนกันทุกช่อง';
+        tip='ชื่อนี้มีอยู่ '+idx.length+' รายการในระบบ ที่หน้าจอดูเหมือนกันทุกช่อง แต่ในชีตเก็บไม่ตรงกัน (มีอักขระที่มองไม่เห็นปนอยู่)';
+      }
+      idx.forEach(function(i){ mark(i, n, {diff:diff, chips:[chip], tip:tip}); });
+    });
+    // (2) ยุบมาอยู่แถวเดียวกันแล้ว แต่ครูแต่ละคนกรอกไม่ตรงกัน — ตัว (1) มองไม่เห็น เพราะเหลือแถวเดียว
+    var INNER=[
+      {key:'seat',   list:'seats',    label:'เลขที่'},
+      {key:'prefix', list:'prefixes', label:'คำนำหน้า'},
+      {key:'cls',    list:'clsList',  label:'ห้อง'},
+      {key:'name',   list:'names',    label:'ชื่อ'}
+    ];
+    groups.forEach(function(g,i){
+      var n=visKey(g.main[1]); if(!n) return;
+      var diff={}, chips=[], parts=[];
+      INNER.forEach(function(f){
+        var vs=g[f.list]||[]; if(vs.length<2) return;
+        var seeable=!vs.every(function(v){ return visKey(v)===visKey(vs[0]); });
+        if(seeable){
+          diff[f.key]=1;                                  // ช่องนี้โชว์สองค่าอยู่แล้ว ตีกรอบได้ ไม่ทำให้งง
+          chips.push(f.label+'ไม่ตรงกัน');
+          parts.push(f.label+' '+vs.join(' กับ ')+' — ครูกรอกไม่ตรงกัน');
+        }else{
+          // ตาเห็นเหมือนกัน แต่ชีตเก็บคนละค่า — ไม่ตีกรอบ บอกด้วยป้ายข้อความอย่างเดียว
+          chips.push(f.label+'ในชีตไม่ตรงกัน (ตาดูเหมือนกัน)');
+          parts.push(f.label+' ที่หน้าจอดูเหมือนกัน แต่ในชีตเก็บคนละค่า (มีอักขระที่มองไม่เห็นปนอยู่)');
+        }
+      });
+      if(!chips.length) return;
+      mark(i, n, {diff:diff, chips:chips, tip:parts.join(' · ')});
+    });
+    var rowCount=0;
+    Object.keys(rows).forEach(function(i){ rows[i].tip=rows[i].tips.join(' · '); rowCount++; });
+    return { rows:rows, names:Object.keys(flagged).length, rowCount:rowCount, people:order.length };
+  }
+
   function renderStudentTable(cfg){
     var q=(document.getElementById('stuQ').value||'').trim().toLowerCase();
     var pr=document.getElementById('stuPct').value;
@@ -1083,12 +1303,16 @@
       return true;
     });
     groups=applySortState(groups, STU_COLS, studentSort);
+    var dupMap=findNameDups(groups);   // ต้องหาหลังเรียงแล้ว เพราะอ้างตำแหน่งแถว
     cardCurrent.lastGroups=groups; cardCurrent.lastRecs=recs;   // เก็บไว้ให้ปุ่ม "ปริ้นตามที่กรอง"
     // CSV ตามที่กรอง (เฉพาะนักเรียนที่เหลือ)
     var keep={}; groups.forEach(function(g){ keep[g.main[1]+'|'+g.main[2]]=1; });
     cardCurrent.csv={ headers:cfg.csvHeaders, rows:built.csvRows.filter(function(row){ return keep[row[1]+'|'+row[2]]; }) };
-    document.getElementById('cardModalTitle').textContent='รายชื่อนักเรียนทั้งหมด ('+groups.length+' คน)';
-    document.getElementById('stuCount').textContent='พบ '+groups.length+' คน'+( (q||pr||code) ? ' (กรองแล้ว)' : '' );
+    // 🚨 หน่วยตรงนี้คือ "รายชื่อ" ไม่ใช่ "คน" — 1 ชื่อที่ถูกกรอกคนละห้องจะเป็น 2 รายชื่อ
+    //    การ์ดหน้าแรกนับเป็น "คน" (ชื่อล้วน) ถ้าเขียนว่า "คน" ทั้งคู่ เลขจะขัดกันเองแล้วคนอ่านงง
+    document.getElementById('cardModalTitle').textContent='รายชื่อนักเรียนทั้งหมด ('+groups.length+' รายชื่อ)';
+    document.getElementById('stuCount').innerHTML='พบ '+groups.length+' รายชื่อ'+( (q||pr||code) ? ' (กรองแล้ว)' : '' )
+      +(dupMap.names? ' · <span class="stu-dupnote">⚠ เป็นนักเรียน '+dupMap.people+' คน — มี '+dupMap.names+' ชื่อที่ซ้ำกันแต่รายละเอียดต่าง ('+dupMap.rowCount+' แถวที่ไฮไลต์)</span>' : '');
     var wrap=document.getElementById('stuTableWrap');
     if(!groups.length){ wrap.innerHTML='<div class="empty-hint">ไม่พบนักเรียนตามเงื่อนไข</div>'; return; }
     // ===== virtual scroll: วาดเฉพาะแถวที่อยู่ในจอ + ช่องว่างบน/ล่าง (กัน Chrome/Edge ค้าง 20 วิตอนวาดตารางใหญ่ในกล่อง scroll พร้อมกัน) =====
@@ -1105,8 +1329,19 @@
       return sh+'</tbody></table>';
     }
     function mainRow(g,gi){
-      var h='<tr class="exp-main'+(expanded[gi]?' open':'')+'" data-gi="'+gi+'"><td class="exp-toggle"><span class="exp-arrow">'+(expanded[gi]?'▼':'▶')+'</span></td>';
-      STU_COLS.forEach(function(col,ci){ var cn=col.center?' class="num"':''; var v=(col.disp||col.get)(g); h+='<td'+cn+(ci===0?' data-tip="กดเพื่อดู / ซ่อนรายวิชาที่ขาด"':'')+'>'+esc(v==null?'':v)+'</td>'; });
+      var d=dupMap.rows[gi];   // ชื่อซ้ำกับแถวอื่น แต่บางช่องต่าง → ไฮไลต์ทั้งแถว + เน้นช่องที่ต่าง
+      var h='<tr class="exp-main'+(expanded[gi]?' open':'')+(d?' dup-row':'')+'" data-gi="'+gi+'"><td class="exp-toggle"><span class="exp-arrow">'+(expanded[gi]?'▼':'▶')+'</span></td>';
+      STU_COLS.forEach(function(col,ci){
+        var cn=[]; if(col.center) cn.push('num');
+        if(d && d.diff[col.key]) cn.push('dup-diff');
+        var v=(col.disp||col.get)(g), txt=esc(v==null?'':v);
+        // ป้ายข้อความต่อท้ายชื่อ — บอกเป็นภาษาไทยว่าแถวนี้ผิดปกติยังไง โดยไม่ต้องเอาเมาส์ไปชี้
+        if(d && col.key==='name'){
+          txt='<span class="dup-mark" title="'+esc(d.tip)+'">⚠</span>'+txt
+             +d.chips.map(function(c){ return '<span class="dup-chip">'+esc(c)+'</span>'; }).join('');
+        }
+        h+='<td'+(cn.length?' class="'+cn.join(' ')+'"':'')+(ci===0?' data-tip="กดเพื่อดู / ซ่อนรายวิชาที่ขาด"':'')+'>'+txt+'</td>';
+      });
       return h+'</tr>';
     }
     function subRowHtml(g,gi){ return '<tr class="exp-sub" data-gi="'+gi+'"><td></td><td colspan="'+STU_COLS.length+'">'+buildSub(g)+'</td></tr>'; }
@@ -1585,6 +1820,9 @@
       html+='<div class="sl-grade">ระดับชั้น '+(lv==='อื่นๆ'?'ไม่ระบุ':'ม.'+esc(lv))+' &nbsp;(รวม '+list.length+' คน)</div>';
       html+='<table class="sl-table">'+colg+'<tbody>';
       list.forEach(function(g,gi){
+        // 🚨 เอกสารนี้เป็นเอกสารราชการที่ส่งออกนอกโรงเรียน — ต้องสะอาด ค่าเดียวต่อช่องเสมอ
+        //    เคยลองพิมพ์ค่าที่ขัดกันทั้งคู่ (เช่น "เลขที่ 22, 23") แล้วเอกสารดูเหมือนพัง ห้ามทำอีก
+        //    ที่ที่ต้องเห็นความขัดแย้งคือหน้าจอ (ป้ายแดงในป๊อปอัปรายชื่อ) ไม่ใช่บนกระดาษ
         var fullName=(g.prefix||'')+g.main[1];
         var pctRvm=(g.opNum==null)?'–':(g.main[4]||'–');
         html+='<tr class="sl-stu">'+
