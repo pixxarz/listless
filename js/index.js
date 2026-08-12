@@ -465,15 +465,38 @@
   reviewModal.addEventListener('click', function(e){ if(e.target===reviewModal) closeReview(); });
 
   // กดยืนยันในหน้าตรวจทาน → บันทึกจริง
-  var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
+  // ===== ที่อยู่ของหลังบ้าน มี 2 ทาง (ดูคำอธิบายเต็มใน js/report.js) =====
+  // /gs = ผ่านเว็บเราเอง (ตั้งใน _redirects) เบราว์เซอร์จึงไม่ต้องแปลชื่อ script.google.com
+  //       ซึ่งเป็นต้นเหตุที่ Edge/Safari เข้าไม่ได้ · ล้มแล้วถอยไปยิงตรง ๆ แบบเดิมอัตโนมัติ
+  var SHEET_URL_PROXY='/gs';
+  var SHEET_URL_DIRECT='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
+  var SHEET_URL=SHEET_URL_PROXY;
+  function markRouteFailed(){
+    if(SHEET_URL===SHEET_URL_PROXY){ SHEET_URL=SHEET_URL_DIRECT; return true; }
+    return false;
+  }
   var saveCtrl=null, saveCancelled=false;
 
-  // ยิง JSONP ถามผลจาก Apps Script (ใช้ยืนยันว่าบันทึกเข้าชีตจริง) — มี timeout กันค้าง
+  // ยิง JSONP ถามผลจาก Apps Script (ใช้ยืนยันว่าบันทึกเข้าชีตจริง)
+  // ล้มแล้วถอยไปยิงตรง ๆ + ลองใหม่อีก 2 ครั้ง เหมือนหน้ารายงาน
+  // (บนเครื่องจริงเจอ ERR_NAME_NOT_RESOLVED บน Edge/Safari ที่แปลชื่อ script.google.com ไม่ได้)
   function jsonpGet(params, cb){
+    var attempt=0;
+    (function go(){
+      attempt++;
+      jsonpGetOnce(params, function(d){
+        if(d==null && markRouteFailed()){ attempt--; go(); return; }        // เปลี่ยนเส้นทาง ไม่นับเป็นการลองซ้ำ
+        if(d==null && attempt<3){ setTimeout(go, Math.pow(2, attempt-1)*1000); return; }
+        cb(d);
+      });
+    })();
+  }
+  function jsonpGetOnce(params, cb){
     var name='__cb'+Date.now()+'_'+Math.floor(Math.random()*1000000000);
     var s=document.createElement('script'), done=false;
-    var timer=setTimeout(function(){ if(!done){ done=true; cleanup(); cb(null); } }, 12000);
-    function cleanup(){ clearTimeout(timer); try{delete window[name];}catch(e){window[name]=undefined;} if(s.parentNode) s.parentNode.removeChild(s); }
+    var timer=setTimeout(function(){ if(!done){ done=true; cleanup(); cb(null); } }, 20000);
+    // แทนที่ด้วยฟังก์ชันเปล่าแทนการลบ — ข้อมูลที่มาช้าจะถูกรับแล้วทิ้งเงียบ ๆ ไม่โผล่เป็น error ในคอนโซล
+    function cleanup(){ clearTimeout(timer); try{ window[name]=function(){}; }catch(e){} if(s.parentNode) s.parentNode.removeChild(s); }
     window[name]=function(dat){ if(done) return; done=true; cleanup(); cb(dat); };
     var q=[]; for(var k in params){ q.push(encodeURIComponent(k)+'='+encodeURIComponent(params[k])); }
     q.push('callback='+name);
@@ -481,6 +504,12 @@
     s.onerror=function(){ if(!done){ done=true; cleanup(); cb(null); } };
     document.body.appendChild(s);
   }
+  // ทดสอบเส้นทางตั้งแต่เปิดหน้า — สำคัญมากสำหรับหน้านี้
+  // การส่งข้อมูลขึ้นชีตใช้วิธีที่ "อ่านผลกลับไม่ได้" ถ้ายิงไปทางที่ใช้ไม่ได้ ข้อมูลครูจะหายเงียบ ๆ
+  // จึงต้องรู้ให้ได้ก่อนว่าจะใช้ทางไหน ตั้งแต่ก่อนครูกดบันทึก
+  // ใช้คำสั่ง verify ที่ไม่ต้องใช้รหัสผ่านและไม่คืนข้อมูลใด ๆ (แค่นับแถวของรหัสที่ไม่มีอยู่จริง = ได้ 0)
+  jsonpGet({ action:'verify', sid:'route-probe' }, function(){});
+
   function showSaveDone(title, msg){
     document.getElementById('successLoading').style.display='none';
     document.getElementById('successDone').style.display='';

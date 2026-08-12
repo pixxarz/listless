@@ -1,5 +1,18 @@
   // ====== ค่าคงที่ ======
-  var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
+  // ===== ที่อยู่ของหลังบ้าน มี 2 ทาง =====
+  // ทางที่ 1 (/gs) — ผ่านเว็บเราเอง ตั้งไว้ใน _redirects ให้ Netlify ส่งต่อไป Apps Script
+  //   เบราว์เซอร์จึงเห็นแค่ชื่อเว็บเรา ไม่ต้องแปลชื่อ script.google.com ซึ่งเป็นต้นเหตุที่ Edge/Safari เข้าไม่ได้
+  //   (วัดจริง: กด 7 ครั้งเข้าได้ 2 ครั้ง เพราะแปลชื่อโดเมนของ Google ไม่ผ่าน)
+  // ทางที่ 2 — ยิงไป script.google.com ตรง ๆ แบบเดิม เก็บไว้เป็นทางถอย
+  //   เผื่อทางผ่านใช้ไม่ได้ (เช่นเปิดไฟล์จากเครื่องตรง ๆ ที่ไม่มี Netlify) จะได้ไม่พังทั้งระบบ
+  // ลองทางที่ 1 ก่อนเสมอ ล้มแล้วค่อยถอยไปทางที่ 2 แล้วจำไว้ว่าทางไหนใช้ได้
+  var SHEET_URL_PROXY='/gs';
+  var SHEET_URL_DIRECT='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
+  var SHEET_URL=SHEET_URL_PROXY;
+  function markRouteFailed(){
+    if(SHEET_URL===SHEET_URL_PROXY){ SHEET_URL=SHEET_URL_DIRECT; return true; }   // ถอยไปทางเดิม
+    return false;
+  }
   var THRESHOLD=70, MIN_DOC_ROWS=10;
   var THAI_MONTHS=['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   var NAME_MAX_FS=18.6667, NAME_MIN_FS=8;
@@ -116,6 +129,9 @@
       if(opts.onTry) opts.onTry(attempt, maxTry);
       once(params, function(data){
         var netFail=data && data.error && (data.error==='network' || data.error==='timeout');
+        // ทางผ่านใช้ไม่ได้ (เช่นเปิดไฟล์ตรง ๆ ที่ไม่มี Netlify) — ถอยไปยิง Google ตรง ๆ แล้วลองใหม่ทันที
+        // ไม่นับเป็นการลองซ้ำ เพราะเป็นการเปลี่ยนเส้นทาง ไม่ใช่เน็ตสะดุด
+        if(netFail && markRouteFailed()){ attempt--; go(); return; }
         if(netFail && attempt<maxTry){ setTimeout(go, Math.pow(2, attempt-1)*1000); return; }
         if(data) data.tries=attempt;
         cb(data);
@@ -180,6 +196,9 @@
       }
     }, { onTry:onTry });
   }
+  // จำข้อความเดิมของปุ่มไว้ตั้งแต่ตอนโหลดหน้า ครั้งเดียว
+  // ถ้าไปอ่านจากปุ่มตอนกด จะได้ข้อความที่ถูกเปลี่ยนไปแล้ว ("ลองใหม่อีกครั้ง") กลายเป็นค่าเดิมผิดตัว
+  var GATE_LABEL=document.getElementById('gateBtn').textContent;
   document.getElementById('gateBtn').addEventListener('click', function(){
     var p=document.getElementById('gatePass').value.trim();
     var err=document.getElementById('gateErr');
@@ -188,10 +207,22 @@
     err.className='err wait';
     this.disabled=true;
     var btn=this;
+    btn.textContent='กำลังเชื่อมต่อ...';   // เปลี่ยนข้อความบนปุ่มด้วย ไม่ใช่แค่กดไม่ได้เฉยๆ
     tryLogin(p,
-      function(msg){ err.textContent=msg; err.className='err'; btn.disabled=false; },
+      // ล้มแล้วเปลี่ยนปุ่มเป็น "ลองใหม่อีกครั้ง" ให้ชัดว่าต้องกดอะไรต่อ
+      // ของเดิมปุ่มกลับไปเขียนว่า "เข้าสู่ระบบ" เหมือนเดิม คนจึงไม่รู้ว่ากดซ้ำได้
+      function(msg){
+        err.textContent=msg; err.className='err';
+        btn.disabled=false;
+        btn.textContent=(msg.indexOf('รหัสผ่าน')>=0) ? GATE_LABEL : 'ลองใหม่อีกครั้ง';
+      },
       // บอกให้รู้ว่าระบบยังพยายามอยู่ ไม่ได้ค้าง — เน็ตสะดุดครั้งแรกเป็นเรื่องปกติของบางเบราว์เซอร์
-      function(n, max){ if(n>1) err.textContent='เครือข่ายสะดุด กำลังลองใหม่ ครั้งที่ '+n+' จาก '+max+'...'; }
+      function(n, max){
+        if(n>1){
+          err.textContent='เครือข่ายสะดุด กำลังลองใหม่ ครั้งที่ '+n+' จาก '+max+'...';
+          btn.textContent='กำลังลองใหม่ ('+n+'/'+max+')';
+        }
+      }
     );
   });
   document.getElementById('gatePass').addEventListener('keydown', function(e){ if(e.key==='Enter') document.getElementById('gateBtn').click(); });
