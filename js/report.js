@@ -1,18 +1,13 @@
   // ====== ค่าคงที่ ======
-  // ===== ที่อยู่ของหลังบ้าน มี 2 ทาง =====
-  // ทางที่ 1 (/gs) — ผ่านเว็บเราเอง ตั้งไว้ใน _redirects ให้ Netlify ส่งต่อไป Apps Script
-  //   เบราว์เซอร์จึงเห็นแค่ชื่อเว็บเรา ไม่ต้องแปลชื่อ script.google.com ซึ่งเป็นต้นเหตุที่ Edge/Safari เข้าไม่ได้
-  //   (วัดจริง: กด 7 ครั้งเข้าได้ 2 ครั้ง เพราะแปลชื่อโดเมนของ Google ไม่ผ่าน)
-  // ทางที่ 2 — ยิงไป script.google.com ตรง ๆ แบบเดิม เก็บไว้เป็นทางถอย
-  //   เผื่อทางผ่านใช้ไม่ได้ (เช่นเปิดไฟล์จากเครื่องตรง ๆ ที่ไม่มี Netlify) จะได้ไม่พังทั้งระบบ
-  // ลองทางที่ 1 ก่อนเสมอ ล้มแล้วค่อยถอยไปทางที่ 2 แล้วจำไว้ว่าทางไหนใช้ได้
-  var SHEET_URL_PROXY='/gs';
-  var SHEET_URL_DIRECT='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
-  var SHEET_URL=SHEET_URL_PROXY;
-  function markRouteFailed(){
-    if(SHEET_URL===SHEET_URL_PROXY){ SHEET_URL=SHEET_URL_DIRECT; return true; }   // ถอยไปทางเดิม
-    return false;
-  }
+  // ===== ที่อยู่ของหลังบ้าน =====
+  // 🚨 เคยลองทำ "ทางผ่าน" ให้ Netlify ส่งต่อคำขอไปแทน (/gs -> Apps Script ด้วยรหัส 200)
+  //    เพื่อให้เบราว์เซอร์ไม่ต้องแปลชื่อ script.google.com ซึ่งเป็นต้นเหตุที่ Edge/Safari เข้าไม่ได้
+  //    ผลคือ Netlify ส่งต่อได้จริง แต่ Google ตอบ 400 Bad Request ทุกครั้ง
+  //    (ทดสอบซ้ำจากเซิร์ฟเวอร์ก็ได้ 400 เหมือนกัน) — Apps Script ยอมคุยกับเบราว์เซอร์จริงเท่านั้น
+  //    ห้ามเสียเวลาลองซ้ำ ไม่ว่าจะเป็น Netlify redirect, Netlify Function หรือ proxy ตัวอื่น
+  //    ที่ทำได้จริงตอนนี้คือยิงตรงแล้วลองใหม่หลายครั้ง (ดูระบบลองใหม่ด้านล่าง)
+  var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
+  function markRouteFailed(){ return false; }   // ไม่มีเส้นทางสำรองแล้ว
   var THRESHOLD=70, MIN_DOC_ROWS=10;
   var THAI_MONTHS=['','มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
   var NAME_MAX_FS=18.6667, NAME_MIN_FS=8;
@@ -119,7 +114,12 @@
   // อาการจึงกลายเป็น "เข้าไม่ได้ถาวร" ทั้งที่ความจริงคือ "ต้องลองอีกที"
   var jsonpId=0;
   var NET_TIMEOUT=45000;   // รอต่อครั้ง — ชีตโตขึ้นและหลังบ้านอ่าน 2 แผ่นต่อครั้ง 20 วิไม่พออีกแล้ว
-  var NET_RETRIES=2;       // ลองซ้ำอีก 2 ครั้ง (รวมเป็น 3) เว้นระยะ 1 แล้ว 2 วินาที
+  // ลองซ้ำอีก 5 ครั้ง (รวมเป็น 6) เว้นระยะเพิ่มขึ้นแต่ไม่เกิน 4 วินาที
+  // วัดจากเครื่องผู้ใช้จริง: โอกาสสำเร็จต่อการยิง 1 ครั้งอยู่ราว 40%
+  //   ลอง 3 ครั้ง = เข้าได้ 80% (ผู้ใช้เจอ "เข้าได้มั่งไม่ได้มั่ง")
+  //   ลอง 6 ครั้ง = เข้าได้ราว 95%
+  // อาการนี้ไม่ใช่พังถาวร แต่เป็นการสุ่มว่ารอบนั้นจะแปลชื่อโดเมนติดหรือไม่ติด จึงแก้ด้วยการเพิ่มโอกาส
+  var NET_RETRIES=5;
 
   function jsonp(params, cb, opts){
     opts=opts||{};
@@ -132,7 +132,8 @@
         // ทางผ่านใช้ไม่ได้ (เช่นเปิดไฟล์ตรง ๆ ที่ไม่มี Netlify) — ถอยไปยิง Google ตรง ๆ แล้วลองใหม่ทันที
         // ไม่นับเป็นการลองซ้ำ เพราะเป็นการเปลี่ยนเส้นทาง ไม่ใช่เน็ตสะดุด
         if(netFail && markRouteFailed()){ attempt--; go(); return; }
-        if(netFail && attempt<maxTry){ setTimeout(go, Math.pow(2, attempt-1)*1000); return; }
+        // เว้นระยะเพิ่มขึ้นเรื่อย ๆ แต่ตัดเพดานที่ 4 วินาที ไม่งั้นครั้งท้าย ๆ จะรอนานเกินไป (32 วินาที)
+        if(netFail && attempt<maxTry){ setTimeout(go, Math.min(Math.pow(2, attempt-1)*1000, 4000)); return; }
         if(data) data.tries=attempt;
         cb(data);
       });

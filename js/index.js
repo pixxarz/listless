@@ -465,16 +465,10 @@
   reviewModal.addEventListener('click', function(e){ if(e.target===reviewModal) closeReview(); });
 
   // กดยืนยันในหน้าตรวจทาน → บันทึกจริง
-  // ===== ที่อยู่ของหลังบ้าน มี 2 ทาง (ดูคำอธิบายเต็มใน js/report.js) =====
-  // /gs = ผ่านเว็บเราเอง (ตั้งใน _redirects) เบราว์เซอร์จึงไม่ต้องแปลชื่อ script.google.com
-  //       ซึ่งเป็นต้นเหตุที่ Edge/Safari เข้าไม่ได้ · ล้มแล้วถอยไปยิงตรง ๆ แบบเดิมอัตโนมัติ
-  var SHEET_URL_PROXY='/gs';
-  var SHEET_URL_DIRECT='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
-  var SHEET_URL=SHEET_URL_PROXY;
-  function markRouteFailed(){
-    if(SHEET_URL===SHEET_URL_PROXY){ SHEET_URL=SHEET_URL_DIRECT; return true; }
-    return false;
-  }
+  // ===== ที่อยู่ของหลังบ้าน =====
+  // 🚨 ทางผ่าน (Netlify ส่งต่อคำขอแทน) ใช้ไม่ได้ Google ตอบ 400 ทุกครั้ง — ดูเหตุผลเต็มใน js/report.js
+  var SHEET_URL='https://script.google.com/macros/s/AKfycbwz6CcXA6m9zxEECOpM8_5TB5e6vn1wnAwkwpZhhZ87jGFxm01SnywzpyjcveIow4ZO/exec';
+  function markRouteFailed(){ return false; }
   var saveCtrl=null, saveCancelled=false;
 
   // ยิง JSONP ถามผลจาก Apps Script (ใช้ยืนยันว่าบันทึกเข้าชีตจริง)
@@ -504,12 +498,6 @@
     s.onerror=function(){ if(!done){ done=true; cleanup(); cb(null); } };
     document.body.appendChild(s);
   }
-  // ทดสอบเส้นทางตั้งแต่เปิดหน้า — สำคัญมากสำหรับหน้านี้
-  // การส่งข้อมูลขึ้นชีตใช้วิธีที่ "อ่านผลกลับไม่ได้" ถ้ายิงไปทางที่ใช้ไม่ได้ ข้อมูลครูจะหายเงียบ ๆ
-  // จึงต้องรู้ให้ได้ก่อนว่าจะใช้ทางไหน ตั้งแต่ก่อนครูกดบันทึก
-  // ใช้คำสั่ง verify ที่ไม่ต้องใช้รหัสผ่านและไม่คืนข้อมูลใด ๆ (แค่นับแถวของรหัสที่ไม่มีอยู่จริง = ได้ 0)
-  jsonpGet({ action:'verify', sid:'route-probe' }, function(){});
-
   function showSaveDone(title, msg){
     document.getElementById('successLoading').style.display='none';
     document.getElementById('successDone').style.display='';

@@ -146,13 +146,13 @@
   // JSONP (ขาอ่าน) — เลี่ยง CORS แบบเดียวกับที่หน้ารายงานใช้ดึงข้อมูลหลัก
   // ต้องลองใหม่เมื่อเน็ตสะดุดเหมือนกัน: บนเครื่องจริงเจอคำขอแรกล้มด้วย ERR_NAME_NOT_RESOLVED
   // (เบราว์เซอร์แปลชื่อ script.google.com ไม่ได้ชั่วขณะ) แล้วครั้งถัดมาสำเร็จ
-  var FX_TIMEOUT=45000, FX_RETRIES=2;
+  var FX_TIMEOUT=45000, FX_RETRIES=5;   // จำนวนเท่ากับหน้ารายงาน (ดูเหตุผลใน js/report.js)
   function jsonpGet(params, cb){
     var attempt=0;
     (function go(){
       attempt++;
       jsonpOnce(params, function(d){
-        if(d==null && attempt<=FX_RETRIES){ setTimeout(go, Math.pow(2, attempt-1)*1000); return; }
+        if(d==null && attempt<=FX_RETRIES){ setTimeout(go, Math.min(Math.pow(2, attempt-1)*1000, 4000)); return; }
         cb(d);
       });
     })();
